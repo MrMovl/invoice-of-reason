@@ -1,5 +1,5 @@
 """Backups: one self-contained tar.gz per run holding a consistent SQLite snapshot,
-every archived PDF and a manifest with SHA-256 checksums.
+every archived PDF, every uploaded expense document and a manifest with SHA-256 checksums.
 
 The backup directory is meant to be picked up by whatever off-site mechanism is
 chosen later (rclone, restic, a USB disk, ...). See docs/BACKUP.md.
@@ -17,7 +17,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import archive, db
+from . import archive, db, expenses
 from .config import Settings
 
 BACKUP_RE = re.compile(r"^invoices-backup-\d{8}-\d{6}\.tar\.gz$")
@@ -43,7 +43,8 @@ def create_backup(settings: Settings) -> Path:
         src = db.connect(settings.db_path)
         try:
             db.init_db(src)
-            problems = archive.verify_all(src, settings.archive_dir)
+            problems = archive.verify_all(src, settings.archive_dir) \
+                + expenses.verify_all(src, settings.expenses_dir)
             if problems:
                 raise BackupError(
                     "Archiv inkonsistent, Backup abgebrochen: "
@@ -57,21 +58,18 @@ def create_backup(settings: Settings) -> Path:
         finally:
             src.close()
 
-        pdfs = sorted(p for p in settings.archive_dir.rglob("*.pdf") if p.is_file()) \
-            if settings.archive_dir.is_dir() else []
+        files = {"invoices.sqlite3": snapshot}
+        files.update(_tree("archive", settings.archive_dir, "*.pdf"))
+        files.update(_tree("expenses", settings.expenses_dir, "*"))
         manifest = {
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "files": {
-                "invoices.sqlite3": _sha256(snapshot),
-                **{f"archive/{p.relative_to(settings.archive_dir)}": _sha256(p) for p in pdfs},
-            },
+            "files": {name: _sha256(p) for name, p in files.items()},
         }
 
         partial = Path(tmp) / target.name
         with tarfile.open(partial, "w:gz") as tar:
-            tar.add(snapshot, arcname="invoices.sqlite3")
-            for p in pdfs:
-                tar.add(p, arcname=f"archive/{p.relative_to(settings.archive_dir)}")
+            for name, p in files.items():
+                tar.add(p, arcname=name)
             raw = json.dumps(manifest, indent=2, sort_keys=True).encode()
             info = tarfile.TarInfo("manifest.json")
             info.size = len(raw)
@@ -82,6 +80,12 @@ def create_backup(settings: Settings) -> Path:
     target.chmod(0o440)
     rotate(settings)
     return target
+
+
+def _tree(prefix: str, root: Path, pattern: str) -> dict[str, Path]:
+    if not root.is_dir():
+        return {}
+    return {f"{prefix}/{p.relative_to(root)}": p for p in sorted(root.rglob(pattern)) if p.is_file()}
 
 
 def list_backups(settings: Settings) -> list[Path]:
@@ -135,5 +139,6 @@ def restore_backup(path: Path, data_dir: Path) -> None:
     with tarfile.open(path, "r:gz") as tar:
         members = [m for m in tar.getmembers() if m.isfile() and m.name != "manifest.json"]
         tar.extractall(data_dir, members=members, filter="data")
-    for p in (data_dir / "archive").rglob("*.pdf"):
-        p.chmod(0o444)
+    for p in (*(data_dir / "archive").rglob("*.pdf"), *(data_dir / "expenses").rglob("*")):
+        if p.is_file():
+            p.chmod(0o444)

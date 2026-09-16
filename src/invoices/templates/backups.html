@@ -15,10 +15,10 @@
   <ul>{% for number, problem in problems %}<li>{{ number }}: {{ problem }}</li>{% endfor %}</ul>
 </div>
 {% else %}
-<p class="flash flash-ok">Alle {{ count }} archivierten PDFs stimmen mit ihren Prüfsummen überein.</p>
+<p class="flash flash-ok">Alle {{ count }} archivierten Rechnungen und {{ expense_count }} Belege stimmen mit ihren Prüfsummen überein.</p>
 {% endif %}
 
-<p class="lede">Backups laufen automatisch täglich. Jede Datei enthält Datenbank, alle PDFs und ein Manifest mit Prüfsummen. Für eine Kopie außerhalb des Servers herunterladen oder per Sync-Tool abholen.</p>
+<p class="lede">Backups laufen automatisch täglich. Jede Datei enthält Datenbank, alle Rechnungen, alle Belege und ein Manifest mit Prüfsummen. Für eine Kopie außerhalb des Servers herunterladen oder per Sync-Tool abholen.</p>
 
 {% if backups %}
 <div class="table-wrap card">

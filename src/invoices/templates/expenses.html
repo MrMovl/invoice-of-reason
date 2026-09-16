@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Ausgaben{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Ausgaben</h1>
+  <form method="get" class="filters">
+    <select name="year" aria-label="Jahr">
+      <option value="">Alle Jahre</option>
+      {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
+    </select>
+    <select name="status" aria-label="Status">
+      <option value="">Alle Status</option>
+      {% for key, label in expense_status_labels.items() %}<option value="{{ key }}" {{ 'selected' if key == status }}>{{ label }}</option>{% endfor %}
+    </select>
+    {% if categories %}
+    <select name="category" aria-label="Kategorie">
+      <option value="">Alle Kategorien</option>
+      {% for c in categories %}<option value="{{ c }}" {{ 'selected' if c == category }}>{{ c }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    <input type="search" name="q" value="{{ q }}" placeholder="Lieferant, Nummer, Text" aria-label="Suche">
+    <button class="btn" type="submit">Filtern</button>
+  </form>
+</div>
+
+<form method="post" action="{{ url_for('web.expense_upload') }}" enctype="multipart/form-data" class="card upload">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Belege hochladen <small>(PDF, JPEG oder PNG, mehrere möglich)</small>
+    <input name="files" type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" multiple required>
+  </label>
+  <button class="btn btn-primary" type="submit">Hochladen</button>
+  <p class="hint">Betrag, Datum, Rechnungsnummer und Lieferant werden aus PDFs mit Text automatisch gelesen. Fotos und Scans bitte von Hand ergänzen. Belege werden unveränderbar archiviert.</p>
+</form>
+
+<dl class="stats">
+  <div><dt>Belege</dt><dd>{{ totals.count }}</dd></div>
+  <div><dt>Bezahlt</dt><dd>{{ totals.paid|eur }}</dd></div>
+  <div><dt>Offen</dt><dd>{{ totals.open|eur }}</dd></div>
+  <div><dt>Zu prüfen</dt><dd>{% if totals.to_review %}<a href="{{ url_for('web.expense_list', review=1) }}">{{ totals.to_review }}</a>{% else %}0{% endif %}</dd></div>
+</dl>
+
+{% if review %}
+<p class="flash flash-warn">Nur ungeprüfte Belege. <a href="{{ url_for('web.expense_list') }}">Alle anzeigen</a></p>
+{% endif %}
+
+{% if rows %}
+<div class="table-wrap card">
+<table>
+  <thead>
+    <tr><th>Datum</th><th>Lieferant</th><th>Kategorie</th><th class="num">Betrag</th><th>Status</th><th><span class="sr-only">Datei</span></th></tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td>{{ r.booked_on|de_date }}</td>
+      <td class="truncate" title="{{ r.vendor or r.original_filename }}">
+        <a href="{{ url_for('web.expense_detail', expense_id=r.id) }}"><strong>{{ r.vendor or r.original_filename or ('Beleg ' ~ r.id) }}</strong></a>
+        {% if r.invoice_number %}<br><small>{{ r.invoice_number }}</small>{% endif %}
+      </td>
+      <td>{{ r.category }}</td>
+      <td class="num">{{ r.amount_cents|eur if r.amount_cents else '–' }}</td>
+      <td>
+        <span class="badge badge-{{ r.status }}">{{ expense_status_labels[r.status] }}</span>
+        {% if not r.reviewed and r.status != 'void' %}<span class="badge badge-overdue">Zu prüfen</span>{% endif %}
+      </td>
+      <td><a href="{{ url_for('web.expense_file', expense_id=r.id, inline=1) }}" target="_blank" rel="noopener">{{ r.doc_type|upper }}</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="card empty">Keine Ausgaben gefunden.</p>
+{% endif %}
+{% endblock %}

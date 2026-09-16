@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -23,15 +24,19 @@ from flask import (
     url_for,
 )
 
-from . import archive, auth, backup, db
+from . import archive, auth, backup, db, expenses
 from .config import ConfigError, load_sender
 from .pdf import FONT_DIR, FONT_FILES, LayoutOverflowError, format_amount, format_date
 
 bp = Blueprint("web", __name__)
 
 STATUS_LABELS = {"open": "Offen", "paid": "Bezahlt", "cancelled": "Storniert"}
+EXPENSE_STATUS_LABELS = {"paid": "Bezahlt", "open": "Offen", "void": "Verworfen"}
 EVENT_LABELS = {
     "created": "Erstellt",
+    "uploaded": "Hochgeladen",
+    "reviewed": "Geprüft",
+    "updated": "Geändert",
     "imported": "Importiert",
     "notes": "Notiz geändert",
     "status:open": "Auf offen gesetzt",
@@ -70,6 +75,7 @@ def inject_globals():
     return {
         "csrf_token": auth.csrf_token,
         "status_labels": STATUS_LABELS,
+        "expense_status_labels": EXPENSE_STATUS_LABELS,
         "current_user": session.get("user"),
     }
 
@@ -189,7 +195,8 @@ def invoice_list():
         "overdue": sum(1 for r in rows if r["status"] == "open" and r["due_date"] and r["due_date"] < today),
     }
     return render_template("list.html", rows=rows, years=years, year=year, status=status,
-                           q=q, totals=totals, today=today)
+                           q=q, totals=totals, today=today,
+                           cash=expenses.cash_summary(conn, year))
 
 
 def _customers(conn):
@@ -317,6 +324,146 @@ def invoice_notes(invoice_id: int):
     return redirect(url_for("web.invoice_detail", invoice_id=invoice_id))
 
 
+# ── Expenses ──────────────────────────────────────────────────────────────
+
+
+@bp.get("/expenses")
+@auth.login_required
+def expense_list():
+    conn = get_db()
+    booked = expenses.booking_date_sql()
+    years = [r[0] for r in conn.execute(
+        f"SELECT DISTINCT substr({booked}, 1, 4) FROM expenses ORDER BY 1 DESC")]
+    year = request.args.get("year", "")
+    status = request.args.get("status", "")
+    category = request.args.get("category", "")
+    review = request.args.get("review", "")
+    q = request.args.get("q", "").strip()
+
+    where, params = [], []
+    if year:
+        where.append(f"substr({booked}, 1, 4) = ?")
+        params.append(year)
+    if status in EXPENSE_STATUS_LABELS:
+        where.append("status = ?")
+        params.append(status)
+    if category:
+        where.append("category = ?")
+        params.append(category)
+    if review:
+        where.append("reviewed = 0 AND status != 'void'")
+    if q:
+        where.append("(vendor LIKE ? OR invoice_number LIKE ? OR category LIKE ? OR notes LIKE ?"
+                     " OR original_filename LIKE ? OR doc_text LIKE ?)")
+        params += [f"%{q}%"] * 6
+    sql = f"SELECT *, {booked} AS booked_on FROM expenses"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    rows = conn.execute(sql + " ORDER BY booked_on DESC, id DESC", params).fetchall()
+
+    totals = {
+        "count": len(rows),
+        "paid": sum(r["amount_cents"] or 0 for r in rows if r["status"] == "paid"),
+        "open": sum(r["amount_cents"] or 0 for r in rows if r["status"] == "open"),
+        "to_review": sum(1 for r in rows if not r["reviewed"] and r["status"] != "void"),
+    }
+    return render_template("expenses.html", rows=rows, years=years, year=year, status=status,
+                           category=category, categories=_categories(conn), review=review,
+                           q=q, totals=totals)
+
+
+def _categories(conn) -> list[str]:
+    return [r[0] for r in conn.execute(
+        "SELECT DISTINCT category FROM expenses WHERE category != '' ORDER BY category")]
+
+
+@bp.post("/expenses/upload")
+@auth.login_required
+def expense_upload():
+    conn = get_db()
+    s = settings()
+    files = [f for f in request.files.getlist("files") if f and f.filename]
+    if not files:
+        flash("Keine Datei ausgewählt.", "error")
+        return redirect(url_for("web.expense_list"))
+    created, errors = [], []
+    for f in files:
+        try:
+            # Read one byte past the limit so oversized files are rejected without loading them whole.
+            data = f.read(expenses.MAX_FILE_SIZE + 1)
+            created.append(expenses.store_upload(conn, s.expenses_dir, data, f.filename,
+                                                 s.retention_years))
+        except archive.ArchiveError as e:
+            errors.append(f"{f.filename}: {e}")
+    for message in errors:
+        flash(message, "error")
+    if len(files) == 1 and created:
+        flash("Beleg hochgeladen. Erkannte Werte prüfen und speichern.", "ok")
+        return redirect(url_for("web.expense_detail", expense_id=created[0]))
+    if created:
+        flash(f"{len(created)} Belege hochgeladen. Bitte die erkannten Werte prüfen.", "ok")
+    return redirect(url_for("web.expense_list", review=1 if created else None))
+
+
+def _get_expense(expense_id: int):
+    row = get_db().execute("SELECT * FROM expenses WHERE id = ?", (expense_id,)).fetchone()
+    if row is None:
+        abort(404)
+    return row
+
+
+@bp.get("/expenses/<int:expense_id>")
+@auth.login_required
+def expense_detail(expense_id: int, form=None):
+    conn = get_db()
+    row = _get_expense(expense_id)
+    events = conn.execute(
+        "SELECT * FROM expense_events WHERE expense_id = ? ORDER BY id DESC", (expense_id,)).fetchall()
+    if form is None:
+        form = dict(row)
+        form["amount"] = format_amount(Decimal(row["amount_cents"]) / 100)[:-2] if row["amount_cents"] else ""
+    problem = expenses.verify_expense(settings().expenses_dir, row)
+    next_review = conn.execute(
+        "SELECT id FROM expenses WHERE reviewed = 0 AND status != 'void' AND id != ? ORDER BY id LIMIT 1",
+        (expense_id,)).fetchone()
+    suggestion = json.loads(row["suggestion_json"])
+    suggestion["amount_cents"] = int(Decimal(suggestion["amount"]) * 100) if suggestion["amount"] else None
+    return render_template("expense.html", exp=row, form=form, events=events, problem=problem,
+                           suggestion=suggestion,
+                           categories=_categories(conn), next_review=next_review,
+                           today=date.today().isoformat())
+
+
+@bp.post("/expenses/<int:expense_id>")
+@auth.login_required
+def expense_update(expense_id: int):
+    _get_expense(expense_id)
+    try:
+        values = expenses.parse_expense_form(request.form)
+        expenses.update_expense(get_db(), expense_id, values)
+    except archive.ArchiveError as e:
+        flash(str(e), "error")
+        return expense_detail(expense_id, form=request.form), 400
+    flash("Beleg gespeichert.", "ok")
+    if request.form.get("next") == "review":
+        nxt = get_db().execute(
+            "SELECT id FROM expenses WHERE reviewed = 0 AND status != 'void' ORDER BY id LIMIT 1").fetchone()
+        if nxt:
+            return redirect(url_for("web.expense_detail", expense_id=nxt["id"]))
+    return redirect(url_for("web.expense_detail", expense_id=expense_id))
+
+
+@bp.get("/expenses/<int:expense_id>/file")
+@auth.login_required
+def expense_file(expense_id: int):
+    row = _get_expense(expense_id)
+    path = settings().expenses_dir / row["doc_path"]
+    if not path.is_file():
+        abort(404, "Datei fehlt im Archiv.")
+    return send_file(path, mimetype=expenses.mimetype(row["doc_type"]),
+                     as_attachment=not request.args.get("inline"), download_name=Path(row["doc_path"]).name)
+
+
 # ── Backups ───────────────────────────────────────────────────────────────
 
 
@@ -324,10 +471,12 @@ def invoice_notes(invoice_id: int):
 @auth.login_required
 def backup_list():
     conn = get_db()
-    problems = archive.verify_all(conn, settings().archive_dir)
+    problems = archive.verify_all(conn, settings().archive_dir) \
+        + expenses.verify_all(conn, settings().expenses_dir)
     count = conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
+    expense_count = conn.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
     return render_template("backups.html", backups=backup.list_backups(settings()),
-                           problems=problems, count=count)
+                           problems=problems, count=count, expense_count=expense_count)
 
 
 @bp.post("/backups")
@@ -360,5 +509,5 @@ def error_page(e):
     code = getattr(e, "code", 500)
     message = getattr(e, "description", "Interner Fehler")
     if code == 413:
-        message = "Datei zu groß (max. 20 MB)."
+        message = "Upload zu groß (max. 50 MB)."
     return render_template("error.html", code=code, message=message), code

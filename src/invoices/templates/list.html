@@ -24,6 +24,16 @@
   <div><dt>Offen</dt><dd>{{ totals.open|eur }}{% if totals.overdue %} <span class="badge badge-overdue">{{ totals.overdue }} überfällig</span>{% endif %}</dd></div>
 </dl>
 
+<section class="cash" aria-labelledby="cash-head">
+  <h2 id="cash-head">Einnahmen und Ausgaben {{ cash.year or 'gesamt' }} <small>nach Zahlungsdatum</small></h2>
+  <dl class="stats">
+    <div><dt>Einnahmen</dt><dd>{{ cash.income|eur }}</dd></div>
+    <div><dt>Ausgaben</dt><dd><a href="{{ url_for('web.expense_list', year=cash.year or None, status='paid') }}">{{ cash.expenses|eur }}</a></dd></div>
+    <div><dt>Überschuss</dt><dd class="{{ 'negative' if cash.surplus < 0 }}">{{ cash.surplus|eur }}</dd></div>
+    {% if cash.to_review %}<div><dt>Belege zu prüfen</dt><dd><a href="{{ url_for('web.expense_list', review=1) }}">{{ cash.to_review }}</a></dd></div>{% endif %}
+  </dl>
+</section>
+
 {% if rows %}
 <div class="table-wrap card">
 <table>

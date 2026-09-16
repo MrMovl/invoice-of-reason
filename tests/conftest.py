@@ -66,3 +66,34 @@ def invoice_form(**overrides):
     }
     form.update(overrides)
     return form
+
+
+def make_pdf(lines: list[str]) -> bytes:
+    """A small PDF with a real text layer, one line per entry (a list entry may hold columns)."""
+    import io
+
+    from reportlab.pdfgen import canvas
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf)
+    y = 800
+    for line in lines:
+        for x, part in zip((50, 330), line.split("|")):
+            c.drawString(x, y, part.strip())
+        y -= 18
+    c.save()
+    return buf.getvalue()
+
+
+SAMPLE_EXPENSE = [
+    "Hetzner Online GmbH · Industriestr. 25 · 91710 Gunzenhausen",
+    "Max Mustermann",
+    "Rechnung",
+    "Rechnungsnummer: R0024567891",
+    "Rechnungsdatum: 03.09.2026",
+    "Fällig am: 17.09.2026",
+    "Cloud Server CX22 | 10,00 €",
+    "Summe netto | 10,00 €",
+    "Umsatzsteuer 19 % | 1,90 €",
+    "Gesamtbetrag | 11,90 €",
+]

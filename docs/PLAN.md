@@ -7,6 +7,8 @@
 2. **Track** every invoice: number, dates, customer, amount, payment status, notes, download.
 3. **Archive** invoices for 10 years, tamper-evident, on the home server, with backups that can
    later be copied off-site.
+4. **Expenses**: upload received invoices and receipts, get amount/date/vendor suggested from the
+   PDF, see income vs. expenses per year.
 
 Reachable at `invoices.example.com` behind a login.
 
@@ -29,6 +31,26 @@ Reachable at `invoices.example.com` behind a login.
   SHA-256, input snapshot incl. sender data) are protected by SQLite triggers: no UPDATE, no DELETE.
   Only `status`, `paid_date`, `notes` can change.
 - `events`: append-only audit log (created, imported, status changes, notes).
+- `expenses`: one row per uploaded document (received invoice, receipt). The document itself
+  (path, SHA-256, size, type, original filename, extracted text, original suggestion) is immutable
+  and the row cannot be deleted. Booking data (vendor, number, date, amount, category, status
+  paid/open/void, paid date, notes) stays correctable; `reviewed` flips to 1 on the first save.
+  Wrong uploads are set to "Verworfen" (void) instead of deleted.
+- `expense_events`: append-only log of uploads and every change with old -> new values.
+
+## Expenses
+
+- Upload one or many PDF/JPEG/PNG files (max. 20 MB each). Identical files are rejected by hash.
+- Documents go to `data/expenses/<upload year>/<YYYYMMDD>_<original name>_<sha8>.<ext>`, same
+  write-once rules as invoice PDFs.
+- PDFs with a text layer are read with `pdftotext -layout` (first 5 pages). `extract.py` suggests
+  vendor (legal form like GmbH, else first line), invoice number, invoice date and the gross total
+  (labelled totals like "Gesamtbetrag"/"Zahlbetrag" win, net/VAT lines are skipped, else the largest
+  amount with a currency). Scans and photos get no suggestion. No OCR, nothing leaves the server.
+- Every upload stays "zu prüfen" until saved once; "Speichern und nächster" walks the review queue.
+- Overview on the archive page: income (paid invoices) vs. expenses (paid expenses) by payment date,
+  per selected year, which matches the cash basis of an EÜR. An expense without a paid date counts
+  on its invoice date.
 
 ## Archive rules
 
@@ -66,6 +88,8 @@ Done in v0.1:
 - Invoices only enter the archive through the create form. The first invoice 2026-001, made
   before the tool existed, was archived once from its original PDF (source "imported").
 - Backups: automatic daily, manual button, download, rotation, verify, restore CLI.
+- Expenses: upload, text-layer suggestions, review queue, categories, search in document text,
+  income/expense summary. Included in verify and backups.
 
 Later (not built):
 - Off-site backup target (decide: see BACKUP.md options).
@@ -73,3 +97,4 @@ Later (not built):
 - E-invoice formats (ZUGFeRD/XRechnung). B2B e-invoicing obligations apply to
   Kleinunternehmer for receiving only; issuing stays optional for them.
 - Sending invoices by email.
+- OCR for scanned expense receipts (tesseract), expense export for the EÜR (Anlage EÜR lines).

@@ -51,13 +51,13 @@ def parse_amount(raw: str) -> Decimal:
     return value.quantize(Decimal("0.01"))
 
 
-def slugify(text: str) -> str:
+def slugify(text: str, fallback: str = "Kunde") -> str:
     """'Nordlicht Werkstatt GmbH' -> 'Nordlicht-Werkstatt-GmbH', umlauts transliterated."""
     for a, b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("Ä", "Ae"), ("Ö", "Oe"), ("Ü", "Ue"), ("ß", "ss")):
         text = text.replace(a, b)
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     slug = re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-")
-    return slug[:60].rstrip("-") or "Kunde"
+    return slug[:60].rstrip("-") or fallback
 
 
 def pdf_filename(number: str, customer_name: str) -> str:
@@ -301,14 +301,18 @@ def set_notes(conn: sqlite3.Connection, invoice_id: int, notes: str) -> None:
         db.add_event(conn, invoice_id, "notes")
 
 
-def verify_invoice(archive_dir: Path, row) -> str | None:
-    """Return None if the archived PDF matches its recorded hash, else a problem description."""
-    path = archive_dir / row["pdf_path"]
+def verify_file(path: Path, sha256: str, missing: str = "PDF fehlt") -> str | None:
+    """Return None if the file matches its recorded hash, else a problem description."""
     if not path.is_file():
-        return "PDF fehlt"
-    if sha256_file(path) != row["pdf_sha256"]:
+        return missing
+    if sha256_file(path) != sha256:
         return "Prüfsumme stimmt nicht"
     return None
+
+
+def verify_invoice(archive_dir: Path, row) -> str | None:
+    """Return None if the archived PDF matches its recorded hash, else a problem description."""
+    return verify_file(archive_dir / row["pdf_path"], row["pdf_sha256"])
 
 
 def verify_all(conn: sqlite3.Connection, archive_dir: Path) -> list[tuple[str, str]]:

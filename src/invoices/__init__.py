@@ -1,4 +1,4 @@
-"""invoice-of-reason: create, archive and back up invoices."""
+"""invoice-of-reason: create, archive and back up invoices, and track expenses."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def create_app(overrides: dict | None = None) -> Flask:
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("INVOICES_INSECURE_COOKIES", "") != "1",
         PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
-        MAX_CONTENT_LENGTH=20 * 1024 * 1024,
+        MAX_CONTENT_LENGTH=50 * 1024 * 1024,
     )
     if overrides:
         app.config.update(overrides)
@@ -43,6 +43,7 @@ def create_app(overrides: dict | None = None) -> Flask:
     db.init_db(conn)
     conn.close()
     settings.archive_dir.mkdir(parents=True, exist_ok=True)
+    settings.expenses_dir.mkdir(parents=True, exist_ok=True)
 
     @app.teardown_appcontext
     def close_db(_exc):

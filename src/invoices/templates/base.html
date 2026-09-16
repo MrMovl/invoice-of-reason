@@ -14,6 +14,7 @@
     {% if current_user %}
     <nav>
       <a href="{{ url_for('web.invoice_list') }}" {% if request.endpoint == 'web.invoice_list' %}aria-current="page"{% endif %}>Archiv</a>
+      <a href="{{ url_for('web.expense_list') }}" {% if request.endpoint in ('web.expense_list', 'web.expense_detail') %}aria-current="page"{% endif %}>Ausgaben</a>
       <a href="{{ url_for('web.backup_list') }}" {% if request.endpoint == 'web.backup_list' %}aria-current="page"{% endif %}>Backups</a>
       <a class="btn btn-primary" href="{{ url_for('web.invoice_new') }}">Neue Rechnung</a>
       <form method="post" action="{{ url_for('web.logout') }}" class="inline">

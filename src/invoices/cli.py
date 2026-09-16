@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import archive, backup, db
+from . import archive, backup, db, expenses
 from .config import load_settings
 
 
@@ -37,11 +37,12 @@ def cmd_verify(_args) -> int:
     conn = db.connect(s.db_path)
     db.init_db(conn)
     count = conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
-    problems = archive.verify_all(conn, s.archive_dir)
+    expense_count = conn.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
+    problems = archive.verify_all(conn, s.archive_dir) + expenses.verify_all(conn, s.expenses_dir)
     for number, problem in problems:
         print(f"FEHLER {number}: {problem}", file=sys.stderr)
     if not problems:
-        print(f"OK: {count} Rechnungen geprüft.")
+        print(f"OK: {count} Rechnungen und {expense_count} Belege geprüft.")
     return 1 if problems else 0
 
 
@@ -88,7 +89,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("hash-password", help="Passwort-Hash für INVOICES_PASSWORD_HASH erzeugen").set_defaults(func=cmd_hash_password)
     sub.add_parser("secret-key", help="Zufälligen INVOICES_SECRET_KEY erzeugen").set_defaults(func=cmd_secret_key)
-    sub.add_parser("verify", help="Alle archivierten PDFs gegen ihre Prüfsummen prüfen").set_defaults(func=cmd_verify)
+    sub.add_parser("verify", help="Alle archivierten Rechnungen und Belege gegen ihre Prüfsummen prüfen").set_defaults(func=cmd_verify)
     p = sub.add_parser("backup", help="Backup erstellen")
     p.add_argument("--every", type=int, metavar="SEKUNDEN", help="Endlos wiederholen in diesem Abstand")
     p.set_defaults(func=cmd_backup)

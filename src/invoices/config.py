@@ -30,6 +30,10 @@ class Settings:
     def archive_dir(self) -> Path:
         return self.data_dir / "archive"
 
+    @property
+    def expenses_dir(self) -> Path:
+        return self.data_dir / "expenses"
+
 
 def load_settings() -> Settings:
     data_dir = Path(os.environ.get("INVOICES_DATA_DIR", "data")).resolve()
