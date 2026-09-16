@@ -13,3 +13,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+// Open <dialog> elements from buttons with data-dialog-open="<dialog id>".
+document.addEventListener("click", (event) => {
+  const trigger = event.target.closest("[data-dialog-open]");
+  if (!trigger) return;
+  const dialog = document.getElementById(trigger.dataset.dialogOpen);
+  if (dialog && typeof dialog.showModal === "function") dialog.showModal();
+});

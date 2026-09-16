@@ -76,10 +76,14 @@
       <dt>Nummer</dt><dd>{{ suggestion.invoice_number or '–' }}</dd>
     </dl>
     {% if exp.doc_text %}
-    <details>
-      <summary>Gelesener Text</summary>
-      <pre class="doc-text">{{ exp.doc_text }}</pre>
-    </details>
+    <button class="btn" type="button" data-dialog-open="doc-text-dialog" aria-haspopup="dialog">Gelesenen Text anzeigen</button>
+    <dialog id="doc-text-dialog" class="text-dialog" aria-labelledby="doc-text-title">
+      <div class="dialog-head">
+        <h2 id="doc-text-title">Gelesener Text <small>{{ exp.original_filename }}</small></h2>
+        <form method="dialog"><button class="btn" type="submit">Schließen</button></form>
+      </div>
+      <pre class="doc-text" tabindex="0">{{ exp.doc_text }}</pre>
+    </dialog>
     {% endif %}
   </section>
 
