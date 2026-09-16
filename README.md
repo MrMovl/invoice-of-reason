@@ -75,4 +75,5 @@ docker compose run --rm app invoices backup     # extra backup now
 
 ## License
 
-Code: MIT. Fonts in `src/invoices/fonts`: SIL Open Font License (see the OFL files there).
+Code: MIT. Fonts in `src/invoices/fonts` (PDF) and `src/invoices/static/fonts` (web UI): SIL Open Font
+License (see the OFL files there).
