@@ -15,7 +15,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("INVOICES_SECRET_KEY", "x" * 40)
     monkeypatch.setenv("INVOICES_USERNAME", "testuser")
     monkeypatch.setenv("INVOICES_PASSWORD_HASH", generate_password_hash(PASSWORD))
-    monkeypatch.setenv("INVOICES_INSECURE_COOKIES", "1")
+    monkeypatch.setenv("INVOICES_INSECURE_COOKIES", "")
     return tmp_path
 
 

@@ -12,6 +12,7 @@ from flask import abort, current_app, redirect, request, session, url_for
 from werkzeug.security import check_password_hash
 
 MAX_FAILURES = 5
+MAX_TRACKED_CLIENTS = 10_000
 LOCKOUT_SECONDS = 15 * 60
 
 # A throwaway hash so a wrong username costs as much time as a wrong password.
@@ -36,8 +37,12 @@ class LoginThrottle:
 
     def fail(self, key: str) -> None:
         with self._lock:
+            now = time.monotonic()
+            if len(self._failures) >= MAX_TRACKED_CLIENTS:
+                # Drop entries older than the lockout window so memory stays bounded.
+                self._failures = {k: v for k, v in self._failures.items() if now - v[1] < LOCKOUT_SECONDS}
             count, _ = self._failures.get(key, (0, 0.0))
-            self._failures[key] = (count + 1, time.monotonic())
+            self._failures[key] = (count + 1, now)
 
     def reset(self, key: str) -> None:
         with self._lock:

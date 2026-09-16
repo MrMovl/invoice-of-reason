@@ -24,6 +24,10 @@ def test_open_redirect_blocked(client):
     csrf = csrf_from(client.get("/login").get_data(as_text=True))
     resp = client.post("/login?next=//evil.example", data={"username": "testuser", "password": PASSWORD, "csrf_token": csrf})
     assert resp.headers["Location"] == "/invoices"
+    client.post("/logout", data={"csrf_token": csrf_from(client.get("/invoices", follow_redirects=True).get_data(as_text=True))})
+    csrf = csrf_from(client.get("/login").get_data(as_text=True))
+    resp = client.post("/login?next=/\\evil.example", data={"username": "testuser", "password": PASSWORD, "csrf_token": csrf})
+    assert resp.headers["Location"] == "/invoices"
 
 
 def test_create_preview_download_and_pay(logged_in, csrf):
@@ -68,3 +72,4 @@ def test_security_headers(logged_in):
     resp = logged_in.get("/invoices")
     assert "frame-ancestors 'none'" in resp.headers["Content-Security-Policy"]
     assert resp.headers["Cache-Control"] == "no-store"
+    assert resp.headers["Strict-Transport-Security"] == "max-age=31536000"

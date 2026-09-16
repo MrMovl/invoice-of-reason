@@ -89,6 +89,8 @@ def security_headers(resp: Response) -> Response:
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("X-Frame-Options", "DENY")
     resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    if current_app.config["SESSION_COOKIE_SECURE"]:
+        resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
     if session.get("user"):
         resp.headers.setdefault("Cache-Control", "no-store")
     return resp
@@ -113,7 +115,8 @@ def healthz():
 def _safe_next(target: str | None) -> str:
     if target:
         parsed = urlparse(target)
-        if not parsed.scheme and not parsed.netloc and target.startswith("/") and not target.startswith("//"):
+        if (not parsed.scheme and not parsed.netloc and target.startswith("/")
+                and not target.startswith("//") and "\\" not in target):
             return target
     return url_for("web.invoice_list")
 
