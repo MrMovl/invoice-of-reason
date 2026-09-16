@@ -68,6 +68,16 @@ def test_backup_page(logged_in, csrf):
     assert c.get("/invoices/import").status_code == 404
 
 
+def test_static_urls_carry_content_version(client):
+    import re
+
+    html = client.get("/login").get_data(as_text=True)
+    css = re.search(r'href="(/static/style\.css\?v=[0-9a-f]{10})"', html)
+    assert css and client.get(css.group(1)).status_code == 200
+    assert re.search(r'src="/static/app\.js\?v=[0-9a-f]{10}"', html)
+    assert 'href="/static/fonts/geist-latin-wght-normal.woff2"' in html
+
+
 def test_security_headers(logged_in):
     resp = logged_in.get("/invoices")
     assert "frame-ancestors 'none'" in resp.headers["Content-Security-Policy"]

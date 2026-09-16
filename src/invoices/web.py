@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import date
+from functools import lru_cache
 from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlparse
@@ -67,6 +69,26 @@ def de_date_filter(iso: str | None) -> str:
 @bp.app_template_filter("event_label")
 def event_label_filter(action: str) -> str:
     return EVENT_LABELS.get(action, action)
+
+
+@lru_cache(maxsize=64)
+def _static_version(folder: str, filename: str) -> str:
+    try:
+        return hashlib.sha256((Path(folder) / filename).read_bytes()).hexdigest()[:10]
+    except OSError:
+        return ""
+
+
+@bp.app_url_defaults
+def static_cache_busting(endpoint, values):
+    # Cloudflare sets a 4 h browser cache on static files. A content hash in the URL makes
+    # every deploy fetch changed CSS/JS immediately instead of mixing new HTML with old CSS.
+    # Fonts stay unversioned: style.css loads them by plain URL, and preloads must match it.
+    if endpoint == "static" and "filename" in values and "v" not in values \
+            and not values["filename"].startswith("fonts/"):
+        version = _static_version(current_app.static_folder, values["filename"])
+        if version:
+            values["v"] = version
 
 
 @bp.app_context_processor
