@@ -1,0 +1,15 @@
+# Copy to config/sender.toml and fill in your real data.
+# config/sender.toml is gitignored: it holds your IBAN and tax number.
+# Changes only affect invoices created afterwards; archived PDFs never change.
+
+[sender]
+name = "Erika Mustermann"
+tagline = "Software & Beratung"
+street = "Musterweg 1"
+city = "12345 Musterstadt"
+email = "mail@example.com"
+website = "example.com"
+tax_number = "12/345/67890"
+iban = "DE02 1203 0000 0000 2020 51"
+bic = "BYLADEM1001"
+account_holder = "Erika Mustermann"

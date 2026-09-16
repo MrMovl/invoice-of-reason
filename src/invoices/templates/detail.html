@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Rechnung {{ inv.number }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Rechnung {{ inv.number }}</h1>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('web.invoice_pdf', invoice_id=inv.id, inline=1) }}" target="_blank" rel="noopener">Ansehen</a>
+    <a class="btn btn-primary" href="{{ url_for('web.invoice_pdf', invoice_id=inv.id) }}">PDF herunterladen</a>
+    <a class="btn" href="{{ url_for('web.invoice_new', **{'from': inv.id}) }}">Als Vorlage</a>
+  </div>
+</div>
+
+{% if problem %}
+<p class="flash flash-error" role="alert">Integritätsproblem: {{ problem }}. Aus Backup wiederherstellen.</p>
+{% endif %}
+
+<div class="detail-grid">
+  <section class="card">
+    <h2>Details</h2>
+    <dl class="kv">
+      <dt>Status</dt>
+      <dd>
+        {% if inv.status == 'open' and inv.due_date and inv.due_date < today %}<span class="badge badge-overdue">Überfällig</span>
+        {% else %}<span class="badge badge-{{ inv.status }}">{{ status_labels[inv.status] }}</span>{% endif %}
+        {% if inv.paid_date %} am {{ inv.paid_date|de_date }}{% endif %}
+      </dd>
+      <dt>Betrag</dt><dd><strong>{{ inv.amount_cents|eur }}</strong></dd>
+      <dt>Rechnungsdatum</dt><dd>{{ inv.issue_date|de_date }}</dd>
+      <dt>Leistungsdatum</dt><dd>{{ inv.service_date }}</dd>
+      <dt>Fällig</dt><dd>{{ inv.due_date|de_date or '–' }}</dd>
+      <dt>Kunde</dt><dd>{{ inv.customer_name }}{% if inv.customer_street %}<br>{{ inv.customer_street }}{% endif %}{% if inv.customer_city %}<br>{{ inv.customer_city }}{% endif %}</dd>
+      <dt>Leistung</dt><dd>{{ inv.title }}{% if inv.description %}<br><span class="muted pre">{{ inv.description }}</span>{% endif %}</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <h2>Zahlung</h2>
+    {% if inv.status != 'paid' %}
+    <form method="post" action="{{ url_for('web.invoice_status', invoice_id=inv.id) }}" class="row">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="paid">
+      <label>Bezahlt am <input type="date" name="paid_date" value="{{ today }}" required></label>
+      <button class="btn btn-primary" type="submit">Als bezahlt markieren</button>
+    </form>
+    {% endif %}
+    {% if inv.status != 'open' %}
+    <form method="post" action="{{ url_for('web.invoice_status', invoice_id=inv.id) }}" class="row">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="open">
+      <button class="btn" type="submit">Wieder auf offen setzen</button>
+    </form>
+    {% endif %}
+    {% if inv.status != 'cancelled' %}
+    <details>
+      <summary>Stornieren</summary>
+      <form method="post" action="{{ url_for('web.invoice_status', invoice_id=inv.id) }}" class="row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="status" value="cancelled">
+        <label>Grund <input name="note" maxlength="500" required></label>
+        <button class="btn btn-danger" type="submit">Stornieren</button>
+      </form>
+      <p class="hint">Die Rechnung bleibt archiviert. Für eine formale Stornorechnung eine neue Rechnung erstellen.</p>
+    </details>
+    {% endif %}
+
+    <h2>Notizen</h2>
+    <form method="post" action="{{ url_for('web.invoice_notes', invoice_id=inv.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <textarea name="notes" rows="3" maxlength="2000">{{ inv.notes }}</textarea>
+      <button class="btn" type="submit">Notiz speichern</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Archiv</h2>
+    <dl class="kv">
+      <dt>Datei</dt><dd><code>{{ inv.pdf_path }}</code></dd>
+      <dt>SHA-256</dt><dd><code class="hash">{{ inv.pdf_sha256 }}</code>{% if not problem %} <span class="badge badge-paid">geprüft</span>{% endif %}</dd>
+      <dt>Herkunft</dt><dd>{{ 'Importiert' if inv.source == 'imported' else 'Erstellt' }} am {{ inv.created_at[:10]|de_date }}</dd>
+      <dt>Aufbewahren bis</dt><dd>{{ inv.retain_until|de_date }}</dd>
+    </dl>
+    <h2>Verlauf</h2>
+    <ul class="events">
+      {% for e in events %}
+      <li><time>{{ e.at[:10]|de_date }} {{ e.at[11:16] }} UTC</time> {{ e.action|event_label }}{% if e.detail %} <span class="muted">{{ e.detail }}</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}Rechnungen{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('web.index') }}"><span class="logo">R</span><span>Rechnungen</span></a>
+    {% if current_user %}
+    <nav>
+      <a href="{{ url_for('web.invoice_list') }}" {% if request.endpoint == 'web.invoice_list' %}aria-current="page"{% endif %}>Archiv</a>
+      <a href="{{ url_for('web.invoice_import') }}" {% if request.endpoint == 'web.invoice_import' %}aria-current="page"{% endif %}>Import</a>
+      <a href="{{ url_for('web.backup_list') }}" {% if request.endpoint == 'web.backup_list' %}aria-current="page"{% endif %}>Backups</a>
+      <a class="btn btn-primary" href="{{ url_for('web.invoice_new') }}">Neue Rechnung</a>
+      <form method="post" action="{{ url_for('web.logout') }}" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn-link" type="submit">Abmelden</button>
+      </form>
+    </nav>
+    {% endif %}
+  </header>
+  <svg class="waves" viewBox="0 0 600 14" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 3 Q 25 0 50 3 T 100 3 T 150 3 T 200 3 T 250 3 T 300 3 T 350 3 T 400 3 T 450 3 T 500 3 T 550 3 T 600 3"/>
+    <path d="M0 7 Q 25 4 50 7 T 100 7 T 150 7 T 200 7 T 250 7 T 300 7 T 350 7 T 400 7 T 450 7 T 500 7 T 550 7 T 600 7"/>
+    <path d="M0 11 Q 25 8 50 11 T 100 11 T 150 11 T 200 11 T 250 11 T 300 11 T 350 11 T 400 11 T 450 11 T 500 11 T 550 11 T 600 11"/>
+  </svg>
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <p class="flash flash-{{ category }}" role="{{ 'alert' if category == 'error' else 'status' }}">{{ message }}</p>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

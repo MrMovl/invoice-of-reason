@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Archiv{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Archiv</h1>
+  <form method="get" class="filters">
+    <select name="year" aria-label="Jahr">
+      <option value="">Alle Jahre</option>
+      {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
+    </select>
+    <select name="status" aria-label="Status">
+      <option value="">Alle Status</option>
+      {% for key, label in status_labels.items() %}<option value="{{ key }}" {{ 'selected' if key == status }}>{{ label }}</option>{% endfor %}
+    </select>
+    <input type="search" name="q" value="{{ q }}" placeholder="Nummer, Kunde, Titel" aria-label="Suche">
+    <button class="btn" type="submit">Filtern</button>
+  </form>
+</div>
+
+<dl class="stats">
+  <div><dt>Rechnungen</dt><dd>{{ totals.count }}</dd></div>
+  <div><dt>Umsatz</dt><dd>{{ totals.billed|eur }}</dd></div>
+  <div><dt>Bezahlt</dt><dd>{{ totals.paid|eur }}</dd></div>
+  <div><dt>Offen</dt><dd>{{ totals.open|eur }}{% if totals.overdue %} <span class="badge badge-overdue">{{ totals.overdue }} überfällig</span>{% endif %}</dd></div>
+</dl>
+
+{% if rows %}
+<div class="table-wrap card">
+<table>
+  <thead>
+    <tr><th>Nummer</th><th>Datum</th><th>Kunde</th><th>Leistung</th><th class="num">Betrag</th><th>Status</th><th><span class="sr-only">PDF</span></th></tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><a href="{{ url_for('web.invoice_detail', invoice_id=r.id) }}"><strong>{{ r.number }}</strong></a></td>
+      <td>{{ r.issue_date|de_date }}</td>
+      <td>{{ r.customer_name }}</td>
+      <td class="truncate" title="{{ r.title }}">{{ r.title }}</td>
+      <td class="num">{{ r.amount_cents|eur }}</td>
+      <td>
+        {% if r.status == 'open' and r.due_date and r.due_date < today %}
+          <span class="badge badge-overdue">Überfällig</span>
+        {% else %}
+          <span class="badge badge-{{ r.status }}">{{ status_labels[r.status] }}</span>
+        {% endif %}
+      </td>
+      <td><a href="{{ url_for('web.invoice_pdf', invoice_id=r.id) }}">PDF</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="card empty">Keine Rechnungen gefunden. <a href="{{ url_for('web.invoice_new') }}">Erste Rechnung erstellen</a> oder <a href="{{ url_for('web.invoice_import') }}">bestehende importieren</a>.</p>
+{% endif %}
+{% endblock %}

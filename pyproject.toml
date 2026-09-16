@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "invoice-of-reason"
+version = "0.1.0"
+description = "Create, archive and back up invoices for a German Kleinunternehmer."
+requires-python = ">=3.11"
+license = "MIT"
+# Versions match Debian trixie packages, which the production image uses.
+dependencies = [
+    "reportlab>=4.3,<6",
+    "flask>=3.1,<4",
+    "gunicorn>=23",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+invoices = "invoices.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+invoices = ["fonts/*", "templates/*.html", "static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,18 @@
+# Personal data and secrets: never commit
+.env
+config/sender.toml
+data/
+backups/
+*.pdf
+*.tar.gz
+# Original handoff material contains bank details and tax number
+HANDOFF_*.md
+rechnung_branded.py
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+build/
+dist/

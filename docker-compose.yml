@@ -1,0 +1,35 @@
+# Production stack. The image is built on a dev machine and shipped by deploy.sh;
+# the Pi does not build it. Everything persistent lives next to this file:
+#   ./data     SQLite database + archived PDFs (keep 10 years)
+#   ./backups  daily backup tarballs, the pickup point for off-site copies
+#   ./config   sender.toml (IBAN, tax number), read-only
+#   .env       login + secret key
+services:
+  app:
+    image: ${APP_IMAGE:-invoice-of-reason:latest}
+    restart: unless-stopped
+    # Loopback only. Cloudflare Tunnel is the sole ingress; Docker bypasses ufw,
+    # so publishing on 0.0.0.0 would expose the app to the whole LAN.
+    ports:
+      - "127.0.0.1:8082:8000"
+    env_file: .env
+    volumes:
+      - ./data:/data
+      - ./backups:/backups
+      - ./config:/config:ro
+    mem_limit: 256m
+
+  backup:
+    image: ${APP_IMAGE:-invoice-of-reason:latest}
+    restart: unless-stopped
+    command: ["invoices", "backup", "--every", "86400"]
+    env_file: .env
+    volumes:
+      - ./data:/data
+      - ./backups:/backups
+      - ./config:/config:ro
+    healthcheck:
+      disable: true
+    mem_limit: 128m
+    depends_on:
+      - app

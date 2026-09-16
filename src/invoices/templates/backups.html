@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Backups{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Backups</h1>
+  <form method="post" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-primary" type="submit">Backup jetzt erstellen</button>
+  </form>
+</div>
+
+{% if problems %}
+<div class="flash flash-error" role="alert">
+  <p>Integritätsprüfung fehlgeschlagen:</p>
+  <ul>{% for number, problem in problems %}<li>{{ number }}: {{ problem }}</li>{% endfor %}</ul>
+</div>
+{% else %}
+<p class="flash flash-ok">Alle {{ count }} archivierten PDFs stimmen mit ihren Prüfsummen überein.</p>
+{% endif %}
+
+<p class="lede">Backups laufen automatisch täglich. Jede Datei enthält Datenbank, alle PDFs und ein Manifest mit Prüfsummen. Für eine Kopie außerhalb des Servers herunterladen oder per Sync-Tool abholen.</p>
+
+{% if backups %}
+<div class="table-wrap card">
+<table>
+  <thead><tr><th>Datei</th><th class="num">Größe</th><th></th></tr></thead>
+  <tbody>
+  {% for b in backups %}
+  <tr>
+    <td><code>{{ b.name }}</code></td>
+    <td class="num">{{ '%.1f'|format(b.stat().st_size / 1024) }} KB</td>
+    <td><a href="{{ url_for('web.backup_download', name=b.name) }}">Herunterladen</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="card empty">Noch keine Backups.</p>
+{% endif %}
+{% endblock %}

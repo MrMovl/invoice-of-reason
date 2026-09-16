@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Neue Rechnung{% endblock %}
+{% block content %}
+<h1>Neue Rechnung</h1>
+<form method="post" action="{{ url_for('web.invoice_create') }}" class="card form-grid">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <fieldset>
+    <legend>Rechnung</legend>
+    <label>Rechnungsnummer
+      <input name="number" value="{{ form.number or '' }}" maxlength="40" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]*">
+    </label>
+    <label>Rechnungsdatum
+      <input name="issue_date" type="date" value="{{ form.issue_date or '' }}" required>
+    </label>
+    <label>Leistungsdatum
+      <input name="service_from" type="date" value="{{ form.service_from or '' }}" required>
+    </label>
+    <label>Leistung bis <small>(optional, für Zeiträume)</small>
+      <input name="service_to" type="date" value="{{ form.service_to or '' }}">
+    </label>
+    <label>Zahlungsziel in Tagen
+      <input name="payment_days" type="number" min="0" max="120" value="{{ form.payment_days or 14 }}" required>
+    </label>
+  </fieldset>
+
+  {% set customer_required = true %}
+  {% include "_customer_fields.html" %}
+
+  <fieldset>
+    <legend>Leistung</legend>
+    <label class="span-2">Titel
+      <input name="title" value="{{ form.title or '' }}" maxlength="200" required>
+    </label>
+    <label class="span-2">Beschreibung
+      <textarea name="description" rows="4" maxlength="1000">{{ form.description or '' }}</textarea>
+    </label>
+    <label>Betrag in €
+      <input name="amount" value="{{ form.amount or '' }}" inputmode="decimal" placeholder="700,00" required>
+    </label>
+    <p class="hint">Kleinunternehmer nach § 19 UStG, keine Umsatzsteuer.</p>
+  </fieldset>
+
+  <div class="actions">
+    <button class="btn" type="submit" formaction="{{ url_for('web.invoice_preview') }}" formtarget="_blank">Vorschau</button>
+    <button class="btn btn-primary" type="submit">Rechnung erstellen</button>
+    <p class="hint">Erstellte Rechnungen werden unveränderbar archiviert. Vorher Vorschau prüfen.</p>
+  </div>
+</form>
+{% endblock %}

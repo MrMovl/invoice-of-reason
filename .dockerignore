@@ -1,0 +1,6 @@
+*
+!src
+!tests
+!config/sender.example.toml
+!pyproject.toml
+**/__pycache__
