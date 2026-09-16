@@ -91,6 +91,7 @@ def test_expense_upload_review_and_overview(logged_in, csrf):
     assert "Geprüft, speichern" in html
     if shutil.which("pdftotext"):
         assert 'value="11,90"' in html and "Hetzner Online GmbH" in html
+        assert '<dialog id="doc-text-dialog"' in html and "Gesamtbetrag" in html
 
     resp = c.post("/expenses/upload", content_type="multipart/form-data", data={
         "csrf_token": csrf, "files": [(io.BytesIO(pdf), "again.pdf"),
