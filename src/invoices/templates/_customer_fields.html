@@ -7,9 +7,9 @@
     <input name="customer_name" list="customers" value="{{ form.customer_name or '' }}" maxlength="80" required data-customer-autofill>
   </label>
   <label>Straße und Nr.
-    <input name="customer_street" value="{{ form.customer_street or '' }}" maxlength="80" {{ 'required' if customer_required }}>
+    <input name="customer_street" value="{{ form.customer_street or '' }}" maxlength="80" required>
   </label>
   <label>PLZ und Ort
-    <input name="customer_city" value="{{ form.customer_city or '' }}" maxlength="80" {{ 'required' if customer_required }}>
+    <input name="customer_city" value="{{ form.customer_city or '' }}" maxlength="80" required>
   </label>
 </fieldset>

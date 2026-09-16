@@ -61,11 +61,6 @@ In Cloudflare Zero Trust, add a public hostname to the existing tunnel:
 Strongly recommended: also add a Cloudflare Access application for `invoices.example.com`
 (policy: your email, one-time PIN). The app has its own login, Access adds a second layer.
 
-### First invoice
-
-Import the already sent invoice 2026-001 via "Import" so the archive is complete and the
-next number becomes 2026-002. Import stores the original PDF unchanged.
-
 ## Operations
 
 ```sh

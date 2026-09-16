@@ -63,7 +63,8 @@ Done in v0.1:
   "use as template", Leistungszeitraum, configurable Zahlungsziel.
 - Archive list with year/status/search filters, totals, overdue marker.
 - Detail page: download/view, mark paid/open/cancelled, notes, integrity status, history.
-- Import of invoices created elsewhere (e.g. the first invoice 2026-001).
+- Invoices only enter the archive through the create form. The first invoice 2026-001, made
+  before the tool existed, was archived once from its original PDF (source "imported").
 - Backups: automatic daily, manual button, download, rotation, verify, restore CLI.
 
 Later (not built):

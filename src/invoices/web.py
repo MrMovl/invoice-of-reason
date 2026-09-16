@@ -314,28 +314,6 @@ def invoice_notes(invoice_id: int):
     return redirect(url_for("web.invoice_detail", invoice_id=invoice_id))
 
 
-@bp.route("/invoices/import", methods=["GET", "POST"])
-@auth.login_required
-def invoice_import():
-    conn = get_db()
-    if request.method == "POST":
-        upload = request.files.get("pdf")
-        try:
-            if not upload or not upload.filename:
-                raise archive.ArchiveError("Bitte eine PDF-Datei auswählen.")
-            form = request.form.to_dict()
-            form["original_filename"] = upload.filename
-            invoice_id = archive.import_invoice(conn, settings().archive_dir, form, upload.read(),
-                                                settings().retention_years)
-        except archive.ArchiveError as e:
-            flash(str(e), "error")
-            return render_template("import.html", form=request.form, customers=_customers(conn)), 400
-        flash("Rechnung importiert und archiviert.", "ok")
-        return redirect(url_for("web.invoice_detail", invoice_id=invoice_id))
-    return render_template("import.html", form={"issue_date": date.today().isoformat()},
-                           customers=_customers(conn))
-
-
 # ── Backups ───────────────────────────────────────────────────────────────
 
 

@@ -1,4 +1,4 @@
-"""Invoice archive: numbering, issuing, importing, status changes and integrity checks.
+"""Invoice archive: numbering, issuing, status changes and integrity checks.
 
 Archived PDFs are write-once. They are created with exclusive mode, made read-only,
 and their SHA-256 is stored so any later modification is detectable.
@@ -237,48 +237,6 @@ def issue_invoice(
             "amount_cents": int(data.amount * 100),
             "payload_json": json.dumps(payload, ensure_ascii=False, sort_keys=True),
             "retain_until": retain_until(data.issue_date, retention_years).isoformat(),
-        },
-    )
-
-
-def import_invoice(
-    conn: sqlite3.Connection,
-    archive_dir: Path,
-    form,
-    pdf: bytes,
-    retention_years: int,
-) -> int:
-    """Archive an invoice PDF that was created outside this tool."""
-    if not pdf.startswith(b"%PDF-"):
-        raise ArchiveError("Die Datei ist keine PDF.")
-    number = validate_number(conn, form.get("number") or "")
-    issue_date = parse_date(form.get("issue_date"), "Rechnungsdatum")
-    due_date = parse_date(form.get("due_date"), "Fälligkeitsdatum", required=False)
-    customer_name = _clean(form.get("customer_name"), "Kunde", 80)
-    title = _clean(form.get("title"), "Leistungstitel", 200)
-    amount = parse_amount(form.get("amount") or "")
-    service_date = _clean(form.get("service_date"), "Leistungsdatum", 60, required=False)
-    rel_path = f"{issue_date.year}/{pdf_filename(number, customer_name)}"
-    payload = {"imported": True, "original_filename": (form.get("original_filename") or "")[:200]}
-    return _record(
-        conn,
-        archive_dir,
-        rel_path,
-        pdf,
-        source="imported",
-        row={
-            "number": number,
-            "issue_date": issue_date.isoformat(),
-            "service_date": service_date or format_date(issue_date),
-            "due_date": due_date.isoformat() if due_date else None,
-            "customer_name": customer_name,
-            "customer_street": _clean(form.get("customer_street"), "Straße", 80, required=False),
-            "customer_city": _clean(form.get("customer_city"), "PLZ und Ort", 80, required=False),
-            "title": title,
-            "description": "",
-            "amount_cents": int(amount * 100),
-            "payload_json": json.dumps(payload, ensure_ascii=False, sort_keys=True),
-            "retain_until": retain_until(issue_date, retention_years).isoformat(),
         },
     )
 

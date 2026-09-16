@@ -1,5 +1,3 @@
-import io
-
 from tests.conftest import PASSWORD, csrf_from, invoice_form
 
 
@@ -54,24 +52,16 @@ def test_create_preview_download_and_pay(logged_in, csrf):
     assert dup.status_code == 400 and "bereits vergeben" in dup.get_data(as_text=True)
 
 
-def test_import_and_backup(logged_in, csrf):
+def test_backup_page(logged_in, csrf):
     c = logged_in
-    bad = c.post("/invoices/import", data={**invoice_form(), "csrf_token": csrf,
-                                           "pdf": (io.BytesIO(b"not a pdf"), "x.pdf")},
-                 content_type="multipart/form-data")
-    assert bad.status_code == 400
-    ok = c.post("/invoices/import", data={**invoice_form(), "csrf_token": csrf,
-                                          "pdf": (io.BytesIO(b"%PDF-1.4 test"), "Rechnung.pdf")},
-                content_type="multipart/form-data")
-    assert ok.status_code == 302
-    assert c.get(ok.headers["Location"] + "/pdf").data == b"%PDF-1.4 test"
-
+    c.post("/invoices", data={**invoice_form(), "csrf_token": csrf})
     assert c.post("/backups", data={"csrf_token": csrf}).status_code == 302
     page = c.get("/backups").get_data(as_text=True)
     name = page.split("invoices-backup-")[1].split(".tar.gz")[0]
     dl = c.get(f"/backups/invoices-backup-{name}.tar.gz")
     assert dl.status_code == 200 and dl.data[:2] == b"\x1f\x8b"
     assert c.get("/backups/..%2finvoices.sqlite3").status_code == 404
+    assert c.get("/invoices/import").status_code == 404
 
 
 def test_security_headers(logged_in):
