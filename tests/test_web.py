@@ -73,3 +73,43 @@ def test_security_headers(logged_in):
     assert "frame-ancestors 'none'" in resp.headers["Content-Security-Policy"]
     assert resp.headers["Cache-Control"] == "no-store"
     assert resp.headers["Strict-Transport-Security"] == "max-age=31536000"
+
+
+def test_expense_upload_review_and_overview(logged_in, csrf):
+    import io
+    import shutil
+
+    from tests.conftest import SAMPLE_EXPENSE, make_pdf
+
+    c = logged_in
+    pdf = make_pdf(SAMPLE_EXPENSE)
+    resp = c.post("/expenses/upload", content_type="multipart/form-data", data={
+        "csrf_token": csrf, "files": [(io.BytesIO(pdf), "hetzner.pdf")]})
+    assert resp.status_code == 302
+    detail_url = resp.headers["Location"]
+    html = c.get(detail_url).get_data(as_text=True)
+    assert "Geprüft, speichern" in html
+    if shutil.which("pdftotext"):
+        assert 'value="11,90"' in html and "Hetzner Online GmbH" in html
+
+    resp = c.post("/expenses/upload", content_type="multipart/form-data", data={
+        "csrf_token": csrf, "files": [(io.BytesIO(pdf), "again.pdf"),
+                                      (io.BytesIO(b"GIF89a"), "x.gif")]})
+    flashes = c.get(resp.headers["Location"]).get_data(as_text=True)
+    assert "bereits hochgeladen" in flashes and "Nur PDF" in flashes
+
+    bad = c.post(detail_url, data={"csrf_token": csrf, "status": "paid", "vendor": "Hetzner", "amount": "",
+                                   "expense_date": "2026-09-03"})
+    assert bad.status_code == 400 and "Betrag fehlt" in bad.get_data(as_text=True)
+    ok = c.post(detail_url, data={"csrf_token": csrf, "status": "paid", "vendor": "Hetzner Online GmbH",
+                                  "amount": "11,90", "expense_date": "2026-09-03", "category": "Hosting"})
+    assert ok.status_code == 302
+    assert "badge-overdue\">Zu prüfen" not in c.get("/expenses").get_data(as_text=True)
+    assert "Hosting" in c.get("/expenses?q=Cloud+Server").get_data(as_text=True)
+
+    doc = c.get(detail_url + "/file?inline=1")
+    assert doc.data.startswith(b"%PDF-") and doc.mimetype == "application/pdf"
+    assert c.get("/expenses/999").status_code == 404
+
+    overview = c.get("/invoices?year=2026").get_data(as_text=True)
+    assert "Einnahmen und Ausgaben 2026" in overview and "-11,90 €" in overview

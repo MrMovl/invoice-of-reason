@@ -5,11 +5,12 @@
 The `backup` service in `docker-compose.yml` runs `invoices backup` once at start and then every
 24 hours. Each run:
 
-1. Verifies every archived PDF against its stored SHA-256. If anything is off, the backup fails
+1. Verifies every archived PDF and expense document against its stored SHA-256. If anything is off, the backup fails
    loudly instead of copying a damaged archive.
 2. Takes a consistent SQLite snapshot with the online backup API (safe while the app runs).
 3. Writes `backups/invoices-backup-YYYYMMDD-HHMMSS.tar.gz` containing `invoices.sqlite3`,
-   `archive/**.pdf` and `manifest.json` (SHA-256 of every file).
+   `archive/**.pdf`, `expenses/**` (uploaded expense documents) and `manifest.json` (SHA-256 of
+   every file).
 4. Rotates: keeps the newest `INVOICES_BACKUP_KEEP` (default 30) plus the newest backup of every
    month, forever. At a few hundred KB per month this is negligible for decades.
 

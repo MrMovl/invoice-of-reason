@@ -2,8 +2,9 @@
 
 Small self-hosted tool to create, track and archive invoices for a German Kleinunternehmer
 (§ 19 UStG). Fill in a form, get a branded PDF, keep it tamper-evident for 10 years, back it up.
+Upload received invoices and receipts as expenses; amounts are read from the PDF automatically.
 
-- Flask + SQLite, PDFs rendered with reportlab
+- Flask + SQLite, PDFs rendered with reportlab, expense PDFs read with `pdftotext` (poppler)
 - Runs as a Docker stack on a Raspberry Pi behind Cloudflare Tunnel
 - UI in German
 
@@ -11,6 +12,9 @@ See [docs/PLAN.md](docs/PLAN.md) for architecture and decisions, [docs/BACKUP.md
 for backups and restore.
 
 ## Local development
+
+Needs `pdftotext` for expense suggestions (`apt install poppler-utils`, `pacman -S poppler`).
+Without it everything works, uploads just get no suggested values.
 
 ```sh
 python3 -m venv .venv
@@ -65,7 +69,7 @@ Strongly recommended: also add a Cloudflare Access application for `invoices.exa
 
 ```sh
 docker compose logs -f app
-docker compose exec app invoices verify         # check all archived PDFs
+docker compose exec app invoices verify         # check all archived invoices and expense documents
 docker compose run --rm app invoices backup     # extra backup now
 ```
 

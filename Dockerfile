@@ -1,10 +1,11 @@
 # Runtime uses Debian's prebuilt python3-reportlab/flask/gunicorn packages, because
 # PyPI has no armv7 wheels for Pillow (a reportlab dependency) and compiling it
 # under qemu is slow. The same image works on amd64 and arm64.
+# poppler-utils provides pdftotext, which reads amounts from uploaded expense PDFs.
 FROM debian:trixie-slim AS runtime
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 python3-reportlab python3-flask gunicorn \
+ && apt-get install -y --no-install-recommends python3 python3-reportlab python3-flask gunicorn poppler-utils \
  && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 1000 app && useradd --uid 1000 --gid 1000 --no-create-home --shell /usr/sbin/nologin app
