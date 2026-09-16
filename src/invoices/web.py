@@ -19,14 +19,13 @@ from flask import (
     render_template,
     request,
     send_file,
-    send_from_directory,
     session,
     url_for,
 )
 
 from . import archive, auth, backup, db, expenses
 from .config import ConfigError, load_sender
-from .pdf import FONT_DIR, FONT_FILES, LayoutOverflowError, format_amount, format_date
+from .pdf import LayoutOverflowError, format_amount, format_date
 
 bp = Blueprint("web", __name__)
 
@@ -100,13 +99,6 @@ def security_headers(resp: Response) -> Response:
     if session.get("user"):
         resp.headers.setdefault("Cache-Control", "no-store")
     return resp
-
-
-@bp.get("/fonts/<name>")
-def font(name: str):
-    if name not in FONT_FILES.values():
-        abort(404)
-    return send_from_directory(FONT_DIR, name, mimetype="font/ttf", max_age=86400 * 30)
 
 
 @bp.get("/healthz")

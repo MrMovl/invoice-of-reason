@@ -4,31 +4,41 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <title>{% block title %}Rechnungen{% endblock %}</title>
+  <title>{% block title %}Rechnungen{% endblock %} · Reibisch</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="preload" href="{{ url_for('static', filename='fonts/newsreader-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ url_for('static', filename='fonts/geist-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="{{ url_for('web.index') }}"><span class="logo">R</span><span>Rechnungen</span></a>
+    <a class="brand" href="{{ url_for('web.index') }}">
+      <svg class="logo" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" fill="#26465a" rx="4"/>
+        <text x="16" y="21" text-anchor="middle" font-family="Newsreader, serif" font-style="italic" font-weight="400" font-size="20" fill="#eef2f1">R</text>
+        <path d="M 8 27 Q 12 24 16 27 T 24 27" fill="none" stroke="#c9b87a" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <span>Reibisch <span class="brand-sub">Rechnungen</span></span>
+    </a>
     {% if current_user %}
-    <nav>
-      <a href="{{ url_for('web.invoice_list') }}" {% if request.endpoint == 'web.invoice_list' %}aria-current="page"{% endif %}>Archiv</a>
+    <nav class="topnav" aria-label="Hauptnavigation">
+      <a href="{{ url_for('web.invoice_list') }}" {% if request.endpoint in ('web.invoice_list', 'web.invoice_detail') %}aria-current="page"{% endif %}>Archiv</a>
       <a href="{{ url_for('web.expense_list') }}" {% if request.endpoint in ('web.expense_list', 'web.expense_detail') %}aria-current="page"{% endif %}>Ausgaben</a>
       <a href="{{ url_for('web.backup_list') }}" {% if request.endpoint == 'web.backup_list' %}aria-current="page"{% endif %}>Backups</a>
-      <a class="btn btn-primary" href="{{ url_for('web.invoice_new') }}">Neue Rechnung</a>
+    </nav>
+    <div class="topbar-actions">
+      <a class="btn btn-primary" href="{{ url_for('web.invoice_new') }}">Neue Rechnung <span class="arrow" aria-hidden="true">→</span></a>
       <form method="post" action="{{ url_for('web.logout') }}" class="inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn-link" type="submit">Abmelden</button>
       </form>
-    </nav>
+    </div>
     {% endif %}
   </header>
-  <svg class="waves" viewBox="0 0 600 14" preserveAspectRatio="none" aria-hidden="true">
-    <path d="M0 3 Q 25 0 50 3 T 100 3 T 150 3 T 200 3 T 250 3 T 300 3 T 350 3 T 400 3 T 450 3 T 500 3 T 550 3 T 600 3"/>
-    <path d="M0 7 Q 25 4 50 7 T 100 7 T 150 7 T 200 7 T 250 7 T 300 7 T 350 7 T 400 7 T 450 7 T 500 7 T 550 7 T 600 7"/>
-    <path d="M0 11 Q 25 8 50 11 T 100 11 T 150 11 T 200 11 T 250 11 T 300 11 T 350 11 T 400 11 T 450 11 T 500 11 T 550 11 T 600 11"/>
-  </svg>
+  <div class="wave-sep" aria-hidden="true">
+    <img class="wave-drift" src="{{ url_for('static', filename='waves.svg') }}" width="1400" height="34" alt="">
+  </div>
   <main>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
@@ -37,5 +47,9 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  <footer class="site-footer">
+    <span>Reibisch · Software &amp; Beratung</span>
+    <span>Kleinunternehmer nach § 19 UStG</span>
+  </footer>
 </body>
 </html>
