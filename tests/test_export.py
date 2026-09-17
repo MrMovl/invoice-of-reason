@@ -32,7 +32,7 @@ def issue(s, conn, **kw):
 def upload(s, conn, data, name, **values):
     exp_id = expenses.store_upload(conn, s.expenses_dir, data, name, s.retention_years)
     form = {"vendor": "Bauhaus", "amount": "49,99", "expense_date": "2026-09-10", "status": "paid",
-            "category": "Werkzeug", "paid_date": "", "invoice_number": "", "notes": ""}
+            "category": "Werkzeug", "paid_date": "", "invoice_number": "", "notes": "", "payment_method": "bank"}
     expenses.update_expense(conn, exp_id, expenses.parse_expense_form({**form, **values}))
     return exp_id
 
@@ -99,14 +99,14 @@ def test_columns_come_from_the_schema(store):
     s, conn = store
     issue(s, conn)
     # New columns default to '' so existing record hashes stay valid (see db.py, hash chain).
-    conn.execute("ALTER TABLE invoices ADD COLUMN payment_method TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE invoices ADD COLUMN later_field TEXT NOT NULL DEFAULT ''")
     conn.commit()
     with zipfile.ZipFile(export.create_export(s)) as zf:
         raw, rows = read_csv(zf, "invoices")
-        assert rows[0]["payment_method"] == ""
+        assert rows[0]["later_field"] == ""
         index = ET.fromstring(zf.read("index.xml"))
     table = next(t for t in index.iter("Table") if t.findtext("Name") == "invoices")
-    assert "payment_method" in [c.findtext("Name") for c in table.iter("VariableColumn")]
+    assert "later_field" in [c.findtext("Name") for c in table.iter("VariableColumn")]
 
 
 def test_index_xml_describes_every_csv_in_order(store):

@@ -36,7 +36,7 @@
   <div><dt>Belege</dt><dd>{{ totals.count }}</dd></div>
   <div><dt>Bezahlt</dt><dd>{{ totals.paid|eur }}</dd></div>
   <div><dt>Offen</dt><dd>{{ totals.open|eur }}</dd></div>
-  <div><dt>Zu prüfen</dt><dd>{% if totals.to_review %}<a href="{{ url_for('web.expense_list', review=1) }}">{{ totals.to_review }}</a>{% else %}0{% endif %}</dd></div>
+  <div><dt>Zu prüfen</dt><dd>{% if totals.to_review %}<a href="{{ url_for('web.expense_list', review=1) }}">{{ totals.to_review }}</a>{% if late %} <span class="badge badge-late">{{ late|length }} über {{ review_days }} Tage</span>{% endif %}{% else %}0{% endif %}</dd></div>
 </dl>
 
 {% if review %}
@@ -61,7 +61,8 @@
       <td class="num">{{ r.amount_cents|eur if r.amount_cents else '–' }}</td>
       <td>
         <span class="badge badge-{{ r.status }}">{{ expense_status_labels[r.status] }}</span>
-        {% if not r.reviewed and r.status != 'void' %}<span class="badge badge-overdue">Zu prüfen</span>{% endif %}
+        {% if r.id in late %}<span class="badge badge-late">über {{ review_days }} Tage ungeprüft</span>
+        {% elif not r.reviewed and r.status != 'void' %}<span class="badge badge-overdue">Zu prüfen</span>{% endif %}
       </td>
       <td><a href="{{ url_for('web.expense_file', expense_id=r.id, inline=1) }}" target="_blank" rel="noopener">{{ r.doc_type|upper }}</a></td>
     </tr>

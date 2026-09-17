@@ -24,6 +24,7 @@
         {% else %}<span class="badge badge-{{ inv.status }}">{{ status_labels[inv.status] }}</span>{% endif %}
         {% if inv.paid_date %} am {{ inv.paid_date|de_date }}{% endif %}
       </dd>
+      {% if inv.status == 'paid' %}<dt>Zahlungsart</dt><dd>{{ payment_labels.get(inv.payment_method, '–') }}</dd>{% endif %}
       <dt>Betrag</dt><dd><strong>{{ inv.amount_cents|eur }}</strong></dd>
       <dt>Rechnungsdatum</dt><dd>{{ inv.issue_date|de_date }}</dd>
       <dt>Leistungsdatum</dt><dd>{{ inv.service_date }}</dd>
@@ -40,7 +41,14 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="status" value="paid">
       <label>Bezahlt am <input type="date" name="paid_date" value="{{ today }}" required></label>
+      <label>Zahlungsart
+        <select name="payment_method" required>
+          <option value="">Bitte wählen</option>
+          {% for key in ('bank', 'cash') %}<option value="{{ key }}">{{ payment_labels[key] }}</option>{% endfor %}
+        </select>
+      </label>
       <button class="btn btn-primary" type="submit">Als bezahlt markieren</button>
+      <p class="hint">Bar: Einnahme am Tag des Zahlungseingangs erfassen (GoBD Rz. 48).</p>
     </form>
     {% endif %}
     {% if inv.status != 'open' %}

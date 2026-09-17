@@ -133,11 +133,13 @@ def test_notes_log_old_and_new_text(store):
 def test_status_logs_old_and_new_values(store):
     s, conn = store
     inv_id = issue(s, conn)
-    archive.set_status(conn, inv_id, "paid", date(2026, 9, 20))
-    assert tuple(last_event(conn)) == ("status:paid", "Status: Offen → Bezahlt; Bezahlt am: – → 20.09.2026")
+    archive.set_status(conn, inv_id, "paid", date(2026, 9, 20), payment_method="bank")
+    assert tuple(last_event(conn)) == ("status:paid", "Status: Offen → Bezahlt; Bezahlt am: – → 20.09.2026; "
+                                                      "Zahlungsart: – → Überweisung/Karte")
     archive.set_status(conn, inv_id, "cancelled", note="Doppelt gestellt")
     assert last_event(conn)["detail"] == \
-        "Status: Bezahlt → Storniert; Bezahlt am: 20.09.2026 → –; Grund: „Doppelt gestellt“"
+        "Status: Bezahlt → Storniert; Bezahlt am: 20.09.2026 → –; Zahlungsart: Überweisung/Karte → –; " \
+        "Grund: „Doppelt gestellt“"
 
 
 def test_cancel_requires_reason(store):
@@ -145,6 +147,8 @@ def test_cancel_requires_reason(store):
     inv_id = issue(s, conn)
     with pytest.raises(archive.ArchiveError, match="Grund"):
         archive.set_status(conn, inv_id, "cancelled", note="  ")
+    with pytest.raises(archive.ArchiveError):
+        archive.set_status(conn, inv_id, "paid", date(2026, 9, 20), payment_method="private")
     assert conn.execute("SELECT status FROM invoices").fetchone()[0] == "open"
 
 
@@ -152,7 +156,8 @@ def test_expense_changes_are_logged_in_full(store):
     s, conn = store
     exp_id = expenses.store_upload(conn, s.expenses_dir, PNG, "a.png", s.retention_years)
     base = {"vendor": "Bauhaus", "amount": "49,99", "expense_date": "2026-09-10", "status": "paid",
-            "category": "Werkzeug", "paid_date": "", "invoice_number": "", "notes": "alt"}
+            "category": "Werkzeug", "paid_date": "", "invoice_number": "", "notes": "alt",
+            "payment_method": "bank"}
     expenses.update_expense(conn, exp_id, expenses.parse_expense_form(base))
     long_note = "n" * 1500
     expenses.update_expense(conn, exp_id, expenses.parse_expense_form({**base, "notes": long_note}))
@@ -166,6 +171,7 @@ def test_voiding_an_expense_requires_reason(store):
         expenses.update_expense(conn, exp_id, expenses.parse_expense_form({"status": "void"}))
     expenses.update_expense(conn, exp_id, expenses.parse_expense_form({"status": "void", "notes": "Fehl-Upload"}))
     assert conn.execute("SELECT status FROM expenses").fetchone()[0] == "void"
+    assert "Status: Bezahlt → Verworfen" in last_event(conn, "expense_events")["detail"]
 
 
 # ── Control log (Rz. 88, 100) ─────────────────────────────────────────────

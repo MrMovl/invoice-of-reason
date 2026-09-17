@@ -21,6 +21,14 @@
     <label>Zahlungsziel in Tagen
       <input name="payment_days" type="number" min="0" max="120" value="{{ form.payment_days or 14 }}" required>
     </label>
+    <details class="span-2 number-override" {{ 'open' if form.number_override }}>
+      <summary>Abweichende Nummer</summary>
+      <label class="check"><input type="checkbox" name="number_override" value="1" {{ 'checked' if form.number_override }}> Abweichende Nummer bewusst verwenden</label>
+      <label>Grund <small>(wird im Verlauf protokolliert)</small>
+        <input name="number_reason" value="{{ form.number_reason or '' }}" maxlength="200">
+      </label>
+      <p class="hint">Nummern folgen dem Schema JJJJ-NNN, fortlaufend ohne Lücken. Eine andere Nummer wird nur mit Grund angenommen.</p>
+    </details>
   </fieldset>
 
   {% include "_customer_fields.html" %}

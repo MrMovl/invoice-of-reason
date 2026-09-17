@@ -47,7 +47,8 @@ def test_create_preview_download_and_pay(logged_in, csrf):
     assert pdf.data.startswith(b"%PDF-")
     assert "Rechnung_2026-001_Nordlicht-Werkstatt-GmbH.pdf" in pdf.headers["Content-Disposition"]
 
-    c.post(detail_url + "/status", data={"status": "paid", "paid_date": "2026-09-20", "csrf_token": csrf})
+    c.post(detail_url + "/status", data={"status": "paid", "paid_date": "2026-09-20", "payment_method": "bank",
+                                       "csrf_token": csrf})
     assert "Bezahlt" in c.get(detail_url).get_data(as_text=True)
     listing = c.get("/invoices?year=2026").get_data(as_text=True)
     assert "700,00 €" in listing
@@ -113,7 +114,8 @@ def test_expense_upload_review_and_overview(logged_in, csrf):
                                    "expense_date": "2026-09-03"})
     assert bad.status_code == 400 and "Betrag fehlt" in bad.get_data(as_text=True)
     ok = c.post(detail_url, data={"csrf_token": csrf, "status": "paid", "vendor": "Hetzner Online GmbH",
-                                  "amount": "11,90", "expense_date": "2026-09-03", "category": "Hosting"})
+                                  "amount": "11,90", "expense_date": "2026-09-03", "category": "Hosting",
+                                  "payment_method": "bank"})
     assert ok.status_code == 302
     assert "badge-overdue\">Zu prüfen" not in c.get("/expenses").get_data(as_text=True)
     assert "Hosting" in c.get("/expenses?q=Cloud+Server").get_data(as_text=True)

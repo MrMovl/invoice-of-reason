@@ -84,6 +84,7 @@ DESCRIPTIONS = {
     "kind": "Art der Kontrolle",
     "ok": "Ergebnis (1 = erfolgreich, 0 = fehlgeschlagen)",
     "app_version": "Programmversion",
+    "payment_method": "Zahlungsart: bank = Überweisung/Karte, cash = bar, private = privat bezahlt (Einlage), leer = nicht erfasst",
     "hash": "SHA-256 der Hash-Kette: Hash des vorigen Eintrags + Inhalt dieses Eintrags (siehe README)",
     "state_hash": "SHA-256 des Datensatzes (Rechnung bzw. Beleg) nach dieser Änderung",
 }

@@ -25,14 +25,16 @@ def issue(s, conn, **kw):
     return archive.issue_invoice(conn, s.archive_dir, inp, load_sender(s.sender_file), s.retention_years)
 
 
-def populate(s, conn):
+def populate(s, conn, paid=True):
     inv_id = issue(s, conn)
-    archive.set_status(conn, inv_id, "paid", date(2026, 9, 20))
+    if paid:
+        archive.set_status(conn, inv_id, "paid", date(2026, 9, 20), payment_method="bank")
     archive.set_notes(conn, inv_id, "Notiz")
     exp_id = expenses.store_upload(conn, s.expenses_dir, PNG, "a.png", s.retention_years)
     form = {"vendor": "Bauhaus", "amount": "49,99", "expense_date": "2026-09-10", "status": "paid",
-            "category": "Werkzeug", "paid_date": "", "invoice_number": "", "notes": ""}
-    expenses.update_expense(conn, exp_id, expenses.parse_expense_form(form))
+            "category": "Werkzeug", "paid_date": "", "invoice_number": "", "notes": "", "payment_method": "bank"}
+    if paid:
+        expenses.update_expense(conn, exp_id, expenses.parse_expense_form(form))
     system.control_run(conn, "verify", True, "ok")
     return inv_id, exp_id
 
@@ -53,7 +55,7 @@ def test_untouched_database_verifies(store):
     assert all(r["hash"] for r in conn.execute("SELECT hash FROM events"))
     # Saving an expense without changes touches only updated_at, which is not part of the state.
     form = {"vendor": "Bauhaus", "amount": "49,99", "expense_date": "2026-09-10", "status": "paid",
-            "category": "Werkzeug", "paid_date": "", "invoice_number": "", "notes": ""}
+            "category": "Werkzeug", "paid_date": "", "invoice_number": "", "notes": "", "payment_method": "bank"}
     expenses.update_expense(conn, 1, expenses.parse_expense_form(form))
     assert chain.verify_chains(conn) == []
 
@@ -112,7 +114,8 @@ def test_migration_seals_existing_data(env, monkeypatch):
     chain_migration = next(i for i, (desc, _) in enumerate(db.MIGRATIONS) if desc == "hash chain over all logs")
     monkeypatch.setattr(db, "MIGRATIONS", db.MIGRATIONS[:chain_migration])
     db.init_db(conn)
-    inv_id, exp_id = populate(s, conn)
+    # Only operations the older schema supports (payment_method comes in a later migration).
+    inv_id, exp_id = populate(s, conn, paid=False)
     before = conn.execute("SELECT id, action, detail FROM events ORDER BY id").fetchall()
     monkeypatch.undo()
 

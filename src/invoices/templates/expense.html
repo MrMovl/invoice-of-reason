@@ -14,6 +14,10 @@
 <p class="flash flash-error" role="alert">Integritätsproblem: {{ problem }}. Aus Backup wiederherstellen.</p>
 {% endif %}
 
+{% if review_late %}
+<p class="flash flash-error" role="alert">Über {{ review_days }} Tage ungeprüft (hochgeladen am {{ exp.created_at[:10]|de_date }}). Belege zeitnah prüfen und erfassen (GoBD Rz. 47).</p>
+{% endif %}
+
 {% if not exp.reviewed and exp.status != 'void' %}
 <p class="flash flash-warn">
   {% if suggestion.text_layer %}Werte wurden automatisch aus dem PDF gelesen{% if not exp.amount_cents %}, ein Betrag wurde nicht gefunden{% endif %}. Bitte prüfen und speichern.
@@ -38,7 +42,7 @@
       <label>Rechnungsnummer
         <input name="invoice_number" value="{{ form.invoice_number or '' }}" maxlength="60">
       </label>
-      <label>Kategorie
+      <label>Kategorie <small>(Pflicht, außer bei „Verworfen“)</small>
         <input name="category" value="{{ form.category or '' }}" maxlength="60" list="categories" placeholder="z. B. Hosting, Hardware, Büro">
         <datalist id="categories">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
       </label>
@@ -49,6 +53,12 @@
       </label>
       <label>Bezahlt am <small>(leer = Rechnungsdatum)</small>
         <input name="paid_date" type="date" value="{{ form.paid_date or '' }}">
+      </label>
+      <label>Zahlungsart <small>(Pflicht bei „Bezahlt“; bar am selben Tag erfassen, GoBD Rz. 48)</small>
+        <select name="payment_method">
+          <option value="">–</option>
+          {% for key, label in payment_labels.items() %}<option value="{{ key }}" {{ 'selected' if key == form.payment_method }}>{{ label }}</option>{% endfor %}
+        </select>
       </label>
       <label>Notiz
         <textarea name="notes" rows="2" maxlength="2000">{{ form.notes or '' }}</textarea>
