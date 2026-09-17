@@ -58,7 +58,9 @@
       <button class="btn" type="submit">Wieder auf offen setzen</button>
     </form>
     {% endif %}
-    {% if inv.status != 'cancelled' %}
+    {% if inv.status == 'paid' %}
+    <p class="hint">Stornieren: Eine bezahlte Rechnung braucht eine Stornorechnung und die Erfassung der Erstattung. Diese Funktion folgt in Kürze. War die Zahlung irrtümlich erfasst, zuerst „Wieder auf offen setzen“.</p>
+    {% elif inv.status != 'cancelled' %}
     <details>
       <summary>Stornieren</summary>
       <form method="post" action="{{ url_for('web.invoice_status', invoice_id=inv.id) }}" class="row">

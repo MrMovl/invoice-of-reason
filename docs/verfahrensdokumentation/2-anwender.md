@@ -62,6 +62,14 @@ und neuem Wert im Verlauf.
 „Stornieren“ mit Pflichtangabe eines Grundes. Die Rechnung bleibt mit Nummer und PDF im Archiv, hat
 den Status „Storniert“ und zählt nicht zu den Einnahmen. Die Nummer bleibt vergeben (keine Lücke).
 
+Eine **bezahlte** Rechnung kann nicht auf diese Weise storniert werden: Der Zahlungseingang ist eine
+Tatsache und bleibt erhalten; rückgängig gemacht wird er nur durch eine Erstattung, die mit einer
+Stornorechnung erfasst wird. War die Zahlung irrtümlich erfasst, wird sie mit „Wieder auf offen
+setzen“ zurückgenommen (protokolliert); danach ist das Stornieren möglich. Die Rechnungsliste meldet
+stornierte Rechnungen, die unmittelbar vor dem Stornieren als bezahlt erfasst waren (Stand vor
+dieser Sperre), weil ihr Zahlungseingang in Übersicht und Umsatzgrenze fehlt. Die Meldung ändert
+nichts an den Daten.
+
 ## 2.4 Notizen
 
 Freitext zu einer Rechnung. Jede Änderung wird mit altem und neuem Text protokolliert.

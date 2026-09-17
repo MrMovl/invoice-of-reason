@@ -10,6 +10,7 @@ entsprechend der Unternehmensgröße (Rz. 15).
 |---|---|---|---|
 | Zugangskontrolle | nur berechtigter Zugriff | jede Anfrage | Anmeldung erforderlich (Teil 4.2) |
 | Eingabeprüfung | plausible Daten | bei jeder Eingabe | Fehlermeldung; ungültige Daten werden nicht gespeichert (Beträge > 0, max. 2 Nachkommastellen, gültige Daten, Pflichtfelder, Leistungszeitraum) |
+| Storno bezahlter Rechnungen | Zahlungseingänge bleiben erhalten | bei jeder Statusänderung; laufend in der Rechnungsliste | Sperre „bezahlt → storniert“ mit Meldung; Hinweis auf stornierte Rechnungen, die direkt vor dem Storno bezahlt waren (nur Anzeige) |
 | Nummernkreis | Vollständigkeit, keine Doppelvergabe | beim Erstellen, laufend in der Rechnungsliste | Nummer eindeutig (Datenbank); abweichende Nummer nur mit Grund im Verlauf; Lückenanzeige |
 | Duplikaterkennung | keine Doppelerfassung von Belegen | beim Hochladen | identische Datei (SHA-256) wird abgelehnt |
 | Prüfpflicht | Richtigkeit automatisch gelesener Werte | jeder Beleg | Status „zu prüfen“ bis zum Speichern; Verlaufseintrag `reviewed` |

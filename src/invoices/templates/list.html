@@ -24,6 +24,13 @@
 </div>
 {% endif %}
 
+{% if receipt_findings %}
+<div class="flash flash-error" role="status">
+  <p>Zahlungseingänge prüfen: stornierte Rechnungen mit erfasster Zahlung.</p>
+  <ul>{% for message in receipt_findings %}<li>{{ message }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
 <dl class="stats">
   <div><dt>Rechnungen</dt><dd>{{ totals.count }}</dd></div>
   <div><dt>Umsatz</dt><dd>{{ totals.billed|eur }}</dd></div>
