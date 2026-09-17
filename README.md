@@ -2,7 +2,9 @@
 
 Small self-hosted tool to create, track and archive invoices for a German Kleinunternehmer
 (§ 19 UStG). Fill in a form, get a branded PDF, keep it tamper-evident for 10 years, back it up.
-Upload received invoices and receipts as expenses; amounts are read from the PDF automatically.
+Upload received invoices and receipts as expenses, including e-invoices (XRechnung, ZUGFeRD);
+amounts are read from the document automatically. Cancel a sent invoice with a Stornorechnung,
+mark purchases under § 13b UStG and capital assets, and watch the § 19 turnover limits.
 
 - Flask + SQLite, PDFs rendered with reportlab, expense PDFs read with `pdftotext` (poppler)
 - Runs as a Docker stack on a Raspberry Pi behind Cloudflare Tunnel
@@ -10,7 +12,9 @@ Upload received invoices and receipts as expenses; amounts are read from the PDF
 
 See [docs/PLAN.md](docs/PLAN.md) for architecture and decisions, [docs/BACKUP.md](docs/BACKUP.md)
 for backups and restore, [docs/GOBD.md](docs/GOBD.md) for the GoBD compliance plan,
-[docs/verfahrensdokumentation/](docs/verfahrensdokumentation/README.md) for the Verfahrensdokumentation (German).
+[docs/verfahrensdokumentation/](docs/verfahrensdokumentation/README.md) for the Verfahrensdokumentation (German),
+[docs/EXPORT.md](docs/EXPORT.md) for the tax-audit export and
+[docs/CANCELLATION.md](docs/CANCELLATION.md) for how cancellations work.
 
 ## Disclaimer
 

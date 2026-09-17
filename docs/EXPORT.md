@@ -18,7 +18,7 @@ successful or not, is recorded in the control log (`control_runs.kind = export`)
 
 | File | |
 |------|---|
-| `invoices.csv`, `events.csv`, `expenses.csv`, `expense_events.csv`, `system_events.csv`, `control_runs.csv` | One CSV per table. Any table a later migration adds is exported too. |
+| `invoices.csv`, `events.csv`, `expenses.csv`, `expense_events.csv`, `external_receipts.csv`, `system_events.csv`, `control_runs.csv` | One CSV per table. Any table a later migration adds is exported too. |
 | `index.xml` | GDPdU "Beschreibungsstandard", `<!DOCTYPE DataSet SYSTEM "gdpdu-01-03-2019.dtd">` |
 | `gdpdu-01-03-2019.dtd` | The DTD, which the standard requires next to `index.xml` |
 | `archive/<pdf_path>` | Archived invoice PDFs |
@@ -36,8 +36,9 @@ successful or not, is recorded in the control log (`control_runs.kind = export`)
   UTC timestamps (`at`, `created_at`, `updated_at`, ISO 8601), is `<AlphaNumeric/>`.
 - **Money**: `amount_cents` stays the stored integer; a derived `amount_eur` column follows it with
   decimal comma (`<Numeric><Accuracy>2</Accuracy></Numeric>`).
-- **Links**: `<ForeignKey>` for `events.invoice_id -> invoices` and
-  `expense_events.expense_id -> expenses`.
+- **Links**: `<ForeignKey>` for `events.invoice_id -> invoices`,
+  `expense_events.expense_id -> expenses` and `invoices.cancels_invoice_id -> invoices`
+  (Stornorechnung to the cancelled invoice).
 - **Year filter**: invoices by `issue_date`, expenses by booking date (payment date, else document
   date, else upload day), change logs only for the exported rows. System and control logs are
   always complete.

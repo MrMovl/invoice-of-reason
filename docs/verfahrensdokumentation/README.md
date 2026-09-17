@@ -43,6 +43,11 @@ nennt die Punkte, die dort beantwortet werden müssen.
 
 ## Stand
 
-Diese Fassung beschreibt den Stand nach Umsetzung des GoBD-Plans (`docs/GOBD.md`, Punkte 2–5, 7,
-8, 10). Offene Punkte dort (Stornorechnung als eigener Beleg, Auslagerung der Datensicherung,
-Ausstellen von E-Rechnungen) sind hier nicht beschrieben, solange sie nicht umgesetzt sind.
+Diese Fassung beschreibt den Stand nach Umsetzung der Punkte 1–5 und 7–10 sowie 16–23 aus
+`docs/GOBD.md`: Änderungsprotokoll, Programmidentität, Kontrollprotokoll, Datenexport, Empfang von
+E-Rechnungen, Vollständigkeits- und Fristenprüfungen, Hash-Kette, Stornorechnung, Umsatzgrenzen
+des § 19 UStG mit außerhalb erfassten Umsätzen, § 13b-Kennzeichnung und Anlagegüter.
+
+Dort offene Punkte sind hier nicht beschrieben, solange sie nicht umgesetzt sind: die Auslagerung
+der Datensicherung (Teil 4.4 nennt sie als offen), das Ausstellen von E-Rechnungen, ein eigener
+Nur-Lese-Zugang für Prüfer und die Festschreibung eines Jahres nach Abgabe der EÜR.

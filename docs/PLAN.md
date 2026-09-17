@@ -155,21 +155,25 @@ Off-site target is intentionally left open; the backup directory is the pickup p
 
 ## Scope
 
-Done in v0.1:
+Done:
 - New invoice form with PDF preview, auto numbering (`YYYY-NNN`), customer autofill,
   "use as template", Leistungszeitraum, configurable Zahlungsziel.
 - Archive list with year/status/search filters, totals, overdue marker.
-- Detail page: download/view, mark paid/open/cancelled, notes, integrity status, history.
+- Detail page: download/view, mark paid/open, cancel (with or without a Stornorechnung), record
+  refunds, notes, integrity status, history.
 - Invoices enter the archive through the create form. Invoices issued before the tool existed are
   archived from their original PDF with the `invoices import-invoice` CLI (source "imported"): no
   web route, reason required, number and amount cross-checked with the PDF text, typed
   confirmation, same write-once rules and hash chain as created invoices.
 - Backups: automatic daily, manual button, download, rotation, verify, restore CLI. They include
   `data/dokumentation/`, where part 6 of the Verfahrensdokumentation and similar documents live.
-- Expenses: upload, text-layer and e-invoice (XRechnung, ZUGFeRD) suggestions, review queue, categories, search in document text,
-  income/expense summary. Included in verify and backups.
+- Expenses: upload, text-layer and e-invoice (XRechnung, ZUGFeRD) suggestions, review queue,
+  categories, payment method, § 13b and asset marking, search in document text, income/expense
+  summary. Included in verify and backups.
+- GoBD: hash chain over all logs, control log, Z3 export, Programmidentität, retention per record.
+- § 19 UStG: turnover limit monitor with receipts recorded outside the tool.
 
-Later (not built):
+Later (not built), see docs/GOBD.md for the full list:
 - Off-site backup target (decide: see BACKUP.md options).
 - Multiple line items, VAT (Regelbesteuerung) once no longer Kleinunternehmer.
 - Issuing e-invoices (ZUGFeRD/XRechnung). B2B e-invoicing obligations apply to

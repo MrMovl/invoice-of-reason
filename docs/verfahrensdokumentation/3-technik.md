@@ -232,5 +232,5 @@ ausgeführter Migrationen. Migrationen ändern nur Struktur oder Format, nie Inh
 | 4 | Spalte `payment_method` in `invoices` und `expenses` |
 | 5 | Spalte `reverse_charge` in `expenses` (Vorgabe leer, Hashes bleiben gültig) |
 | 6 | Spalte `treatment` in `expenses` (Vorgabe leer, Hashes bleiben gültig) |
-| 8 | Tabelle `external_receipts` mit Anfüge-Triggern, Teil der Hash-Kette |
 | 7 | Spalten `kind` und `cancels_invoice_id` in `invoices`, eindeutiger Index auf `cancels_invoice_id`, Trigger `invoices_cancellation_reference`; `invoices_immutable` mit beiden Spalten neu erstellt (Vorgaben leer bzw. NULL, Hashes bleiben gültig) |
+| 8 | Tabelle `external_receipts` mit Anfüge-Triggern, Teil der Hash-Kette |
