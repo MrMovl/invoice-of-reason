@@ -46,6 +46,14 @@ Reachable at `invoices.example.com` behind a login.
   that all protective triggers exist, so dropping a trigger and editing the file is detected.
   New columns must default to NULL or '' (omitted from hashes) or come with a re-seal migration.
 
+## Receipts outside the tool
+
+`external_receipts` is an append-only table (triggers, hash chain, export) of receipts belonging to
+the same Unternehmer but not invoiced here (§ 2 Abs. 1 Satz 2 UStG). Entered by date, amount,
+source and note on the "Extern" page; corrections are counter-entries with a mandatory note. They
+count in `turnover.status` for the current and previous year and can be the crossing receipt. They
+are deliberately **not** part of `cash_summary`: the records of those activities live elsewhere.
+
 ## Cancellation documents
 
 - Cancelling an invoice that was never sent (only while unpaid) stays a status change with a reason.

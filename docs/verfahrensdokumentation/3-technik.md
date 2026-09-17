@@ -100,6 +100,20 @@ der Stornorechnung heißt der Statuswechsel „Erstattung: … → …“.
 Aktionen `expense_events`: `uploaded` hochgeladen (`sha256=…`), `reviewed` erstmals geprüft und
 gespeichert, `updated` später geändert, `sealed` wie oben.
 
+### external_receipts – außerhalb erfasste Umsätze (nur anfügbar)
+
+| Feld | Bedeutung |
+|---|---|
+| `id` | laufende Nummer, lückenlos |
+| `received_on` | Tag des Zahlungseingangs |
+| `amount_cents` | vereinnahmter Betrag in Cent; negativ bei einer Korrektur (Gegenbuchung) |
+| `source` | Herkunft (Tätigkeit, Plattform, Abnehmer) |
+| `note` | Notiz; bei einer Korrektur Pflicht |
+| `created_at` | Zeitpunkt der Erfassung (UTC) |
+| `hash` | Glied der Hash-Kette (3.4) |
+
+Nur für die Umsatzgrenzen des § 19 UStG (2.10); nicht Teil der Einnahmen-Überschuss-Rechnung.
+
 ### system_events – Systemprotokoll
 
 | `action` | `detail` |
@@ -218,4 +232,5 @@ ausgeführter Migrationen. Migrationen ändern nur Struktur oder Format, nie Inh
 | 4 | Spalte `payment_method` in `invoices` und `expenses` |
 | 5 | Spalte `reverse_charge` in `expenses` (Vorgabe leer, Hashes bleiben gültig) |
 | 6 | Spalte `treatment` in `expenses` (Vorgabe leer, Hashes bleiben gültig) |
+| 8 | Tabelle `external_receipts` mit Anfüge-Triggern, Teil der Hash-Kette |
 | 7 | Spalten `kind` und `cancels_invoice_id` in `invoices`, eindeutiger Index auf `cancels_invoice_id`, Trigger `invoices_cancellation_reference`; `invoices_immutable` mit beiden Spalten neu erstellt (Vorgaben leer bzw. NULL, Hashes bleiben gültig) |

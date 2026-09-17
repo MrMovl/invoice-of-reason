@@ -413,6 +413,40 @@ def invoice_notes(invoice_id: int):
 # ── Expenses ──────────────────────────────────────────────────────────────
 
 
+@bp.get("/umsaetze-extern")
+@auth.login_required
+def external_receipts():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM external_receipts ORDER BY received_on DESC, id DESC").fetchall()
+    years: dict[str, dict] = {}
+    for row in rows:
+        year = years.setdefault(row["received_on"][:4], {"total": 0, "sources": {}})
+        year["total"] += row["amount_cents"]
+        year["sources"][row["source"]] = year["sources"].get(row["source"], 0) + row["amount_cents"]
+    return render_template("external.html", rows=rows, years=sorted(years.items(), reverse=True),
+                           today=date.today().isoformat())
+
+
+@bp.post("/umsaetze-extern")
+@auth.login_required
+def external_receipt_add():
+    conn = get_db()
+    try:
+        received_on = archive.parse_date(request.form.get("received_on"), "Datum des Zahlungseingangs")
+        amount = archive.parse_amount(request.form.get("amount") or "")
+        cents = int(amount * 100) * (-1 if request.form.get("direction") == "correction" else 1)
+        source = archive._clean(request.form.get("source"), "Herkunft", 120)
+        note = archive._clean(request.form.get("note"), "Notiz", 500, required=cents < 0)
+        if received_on > date.today():
+            raise archive.ArchiveError("Das Datum liegt in der Zukunft.")
+        db.add_external_receipt(conn, received_on.isoformat(), cents, source, note)
+    except archive.ArchiveError as e:
+        flash(str(e), "error")
+        return redirect(url_for("web.external_receipts"))
+    flash("Umsatz erfasst.", "ok")
+    return redirect(url_for("web.external_receipts"))
+
+
 @bp.get("/expenses")
 @auth.login_required
 def expense_list():

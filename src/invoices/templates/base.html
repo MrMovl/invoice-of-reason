@@ -25,6 +25,7 @@
     <nav class="topnav" aria-label="Hauptnavigation">
       <a href="{{ url_for('web.invoice_list') }}" {% if request.endpoint in ('web.invoice_list', 'web.invoice_detail') %}aria-current="page"{% endif %}>Archiv</a>
       <a href="{{ url_for('web.expense_list') }}" {% if request.endpoint in ('web.expense_list', 'web.expense_detail') %}aria-current="page"{% endif %}>Ausgaben</a>
+      <a href="{{ url_for('web.external_receipts') }}" {% if request.endpoint == 'web.external_receipts' %}aria-current="page"{% endif %}>Extern</a>
       <a href="{{ url_for('web.backup_list') }}" {% if request.endpoint == 'web.backup_list' %}aria-current="page"{% endif %}>Backups</a>
     </nav>
     <div class="topbar-actions">

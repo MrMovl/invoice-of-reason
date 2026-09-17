@@ -32,6 +32,11 @@ Im Programm geführt:
 | Eingangsrechnungen, Quittungen | PDF, JPEG, PNG, E-Rechnung (XRechnung-XML, ZUGFeRD-PDF) im Empfangsformat | Archiv, unveränderbar |
 | Buchungsdaten der Ausgaben | Datensätze in SQLite | Datenbank, Änderungen protokolliert |
 | Änderungs-, System- und Kontrollprotokolle | Datensätze in SQLite, Hash-Kette | Datenbank, nur anfügbar |
+| Außerhalb erfasste Umsätze (nur Beträge, für die Umsatzgrenzen des § 19 UStG) | Datensätze in SQLite, Hash-Kette | Datenbank, nur anfügbar |
+
+Die außerhalb erfassten Umsätze (2.10) sind ausschließlich eine Hilfsaufzeichnung für die
+Umsatzgrenzen. Die Aufzeichnungen, Belege und Rechnungen der betreffenden Tätigkeiten werden
+außerhalb dieses Programms geführt (Teil 6).
 
 Nicht im Programm geführt (Ablage siehe Teil 6): Kontoauszüge, geschäftliche E-Mails und sonstige
 Handels- und Geschäftsbriefe, Verträge, Steuerbescheide, Papierbelege vor der Erfassung, eine Kasse

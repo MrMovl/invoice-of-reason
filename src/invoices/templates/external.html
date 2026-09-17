@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Umsätze außerhalb{% endblock %}
+{% block content %}
+<h1>Umsätze außerhalb dieses Programms</h1>
+
+<p class="lede">Nur für die Umsatzgrenzen der Kleinunternehmerregelung (§ 19 UStG): Für die Umsatzsteuer hat eine Person ein Unternehmen mit allen selbständigen Tätigkeiten (§ 2 Abs. 1 Satz 2 UStG), also zählen auch Einnahmen, die nicht über dieses Programm abgerechnet werden. Die Aufzeichnungen und Belege dieser Tätigkeiten werden außerhalb geführt; hier stehen nur die Beträge für die Grenzwertüberwachung. Diese Einträge erscheinen nicht in der Einnahmen-/Ausgabenübersicht.</p>
+
+<form method="post" class="card form-grid">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Datum des Zahlungseingangs
+    <input name="received_on" type="date" value="{{ today }}" required>
+  </label>
+  <label>Betrag in €
+    <input name="amount" inputmode="decimal" placeholder="1.200,00" required>
+  </label>
+  <label>Herkunft
+    <input name="source" maxlength="120" placeholder="z. B. PV-Einspeisung, Marktplatz" required>
+  </label>
+  <label>Art
+    <select name="direction">
+      <option value="receipt">Zahlungseingang</option>
+      <option value="correction">Korrektur (Gegenbuchung, negativ)</option>
+    </select>
+  </label>
+  <label class="span-2">Notiz <small>(bei einer Korrektur Pflicht)</small>
+    <input name="note" maxlength="500">
+  </label>
+  <div class="actions">
+    <button class="btn btn-primary" type="submit">Erfassen</button>
+    <p class="hint">Einzutragen ist, was vereinnahmt wurde, nicht der Gewinn. Beim Wiederverkauf mit Differenzbesteuerung zählt der volle Verkaufserlös, nicht die Marge. Einträge können nicht geändert oder gelöscht werden; eine Korrektur ist eine Gegenbuchung mit negativem Betrag und Begründung.</p>
+  </div>
+</form>
+
+{% if years %}
+{% for year, data in years %}
+<section class="cash">
+  <h2>{{ year }}: {{ data.total|eur }}</h2>
+  <dl class="stats">
+    {% for source, total in data.sources.items() %}<div><dt>{{ source }}</dt><dd>{{ total|eur }}</dd></div>{% endfor %}
+  </dl>
+</section>
+{% endfor %}
+
+<div class="table-wrap card">
+<table>
+  <thead><tr><th>Eingang</th><th>Herkunft</th><th class="num">Betrag</th><th>Notiz</th><th>Erfasst</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td>{{ r.received_on|de_date }}</td>
+      <td>{{ r.source }}</td>
+      <td class="num {{ 'negative' if r.amount_cents < 0 }}">{{ r.amount_cents|eur }}</td>
+      <td class="muted">{{ r.note }}</td>
+      <td><time>{{ r.created_at[:10]|de_date }}</time></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="card empty">Noch keine Umsätze außerhalb erfasst.</p>
+{% endif %}
+{% endblock %}

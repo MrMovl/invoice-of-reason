@@ -12,6 +12,7 @@ TABLE_NAMES = {
     "expense_events": "Belegverlauf",
     "system_events": "Systemprotokoll",
     "control_runs": "Kontrollprotokoll",
+    "external_receipts": "Umsätze außerhalb des Programms",
 }
 
 

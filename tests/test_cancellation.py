@@ -260,7 +260,7 @@ def test_turnover_crossing_ignores_cancellation_documents(cancelled_book):
                 service_from="2026-06-01", limit_override="1", limit_reason="Test")
     archive.set_status(conn, big, "paid", date(2026, 6, 1), payment_method="bank")
     st = turnover.status(conn, founding_year=2026, year=2026)
-    assert st.crossing == ("2026-006", "2026-06-01")
+    assert (st.crossing.label, st.crossing.day) == ("zu Rechnung 2026-006", "2026-06-01")
 
 
 def test_list_totals_separate_invoices_and_cancellations(cancelled_book, logged_in):

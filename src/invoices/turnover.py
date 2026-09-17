@@ -2,15 +2,17 @@
 
 Rules as implemented (§ 19 Abs. 1 UStG; BMF-Schreiben vom 18.03.2025, UStAE 19.1 ff.):
 
-- The Gesamtumsatz is counted by receipts: invoices with status paid, in the year of paid_date.
+- The Gesamtumsatz is counted by receipts: invoices with status paid, in the year of paid_date,
+  plus receipts of the same Unternehmer recorded outside this tool (external_receipts). For VAT a
+  person has one Unternehmen covering all self-employed activities (§ 2 Abs. 1 Satz 2 UStG).
 - Previous year above 25,000 €: no Kleinunternehmer status for the whole current year.
 - Current year above 100,000 €: the status ends immediately. The receipt that crosses the limit is
   already taxable, and so is every later receipt, even for work done earlier.
 - Founding year: there is no previous year, and 25,000 € is the limit for the founding year itself,
   with the same immediate effect. No extrapolation to a full year.
 
-Only receipts recorded in this tool count. Whether income outside it belongs to the Gesamtumsatz is
-an open question (docs/GOBD.md), so the monitor may understate the real turnover.
+Only what is recorded counts: invoices here plus the external receipts entered by hand. Whether a
+given activity is unternehmerisch at all stays a question for the Steuerberater (docs/GOBD.md).
 
 This is a warning system, not a tax calculation: the tool cannot issue invoices with VAT.
 """
@@ -38,17 +40,32 @@ def eur(cents: int) -> str:
     return format_amount(Decimal(cents) / 100)
 
 
+@dataclass(frozen=True)
+class Receipt:
+    """One receipt counting toward the Gesamtumsatz, from an invoice or recorded externally."""
+
+    day: str                 # ISO date
+    label: str               # for messages, e.g. 'zu Rechnung 2026-003'
+    cents: int
+    external: bool
+
+
 @dataclass
 class Status:
     year: int
     founding_year: int | None
-    received: int            # paid invoices in `year`, by paid_date
+    received_internal: int   # paid invoices in `year`, by paid_date
+    received_external: int   # external receipts in `year`, by received_on
     open: int                # all open invoices, projected into `year`
-    previous_year: int       # paid invoices in `year - 1`
+    previous_year: int       # receipts in `year - 1`, both sources
     limit: int               # applicable hard limit for `year`
     is_founding_year: bool
-    crossing: tuple[str, str] | None = None  # (invoice number, paid date) of the crossing receipt
+    crossing: Receipt | None = None
     warnings: list[str] = field(default_factory=list)
+
+    @property
+    def received(self) -> int:
+        return self.received_internal + self.received_external
 
     @property
     def projected(self) -> int:
@@ -78,25 +95,44 @@ def _received(conn: sqlite3.Connection, year: int) -> int:
     return conn.execute(f"SELECT COALESCE(SUM(amount_cents), 0) {RECEIPTS_SQL}", (f"{year:04d}",)).fetchone()[0]
 
 
+def _external(conn: sqlite3.Connection, year: int) -> int:
+    return conn.execute(
+        "SELECT COALESCE(SUM(amount_cents), 0) FROM external_receipts WHERE substr(received_on, 1, 4) = ?",
+        (f"{year:04d}",)).fetchone()[0]
+
+
+def receipts(conn: sqlite3.Connection, year: int) -> list[Receipt]:
+    """All receipts of one year in the order they arrived, invoices and external entries together."""
+    out = [Receipt(day=row["paid_date"], label=f"zu Rechnung {row['number']}", cents=row["amount_cents"],
+                   external=False)
+           for row in conn.execute(f"SELECT number, paid_date, amount_cents {RECEIPTS_SQL}", (f"{year:04d}",))]
+    out += [Receipt(day=row["received_on"], label=f"außerhalb erfasst: {row['source']}",
+                    cents=row["amount_cents"], external=True)
+            for row in conn.execute(
+                "SELECT received_on, amount_cents, source FROM external_receipts "
+                "WHERE substr(received_on, 1, 4) = ?", (f"{year:04d}",))]
+    return sorted(out, key=lambda r: (r.day, r.external, r.label))
+
+
 def status(conn: sqlite3.Connection, founding_year: int | None, year: int | None = None) -> Status:
     year = year or date.today().year
     is_founding = founding_year == year
     st = Status(
         year=year,
         founding_year=founding_year,
-        received=_received(conn, year),
+        received_internal=_received(conn, year),
+        received_external=_external(conn, year),
         open=conn.execute(
             "SELECT COALESCE(SUM(amount_cents), 0) FROM invoices WHERE kind = '' AND status = 'open'").fetchone()[0],
-        previous_year=0 if is_founding else _received(conn, year - 1),
+        previous_year=0 if is_founding else _received(conn, year - 1) + _external(conn, year - 1),
         limit=FOUNDING_YEAR_LIMIT_CENTS if is_founding else CURRENT_YEAR_LIMIT_CENTS,
         is_founding_year=is_founding,
     )
     running = 0
-    for number, paid, cents in conn.execute(
-        f"SELECT number, paid_date, amount_cents {RECEIPTS_SQL} ORDER BY paid_date, id", (f"{year:04d}",)):
-        running += cents
+    for receipt in receipts(conn, year):
+        running += receipt.cents
         if running > st.limit:
-            st.crossing = (number, paid)
+            st.crossing = receipt
             break
     st.warnings = _warnings(st)
     return st
@@ -111,8 +147,8 @@ def _warnings(st: Status) -> list[str]:
         out.append(f"Umsatz {st.year - 1}: {eur(st.previous_year)}, über {eur(PREVIOUS_YEAR_LIMIT_CENTS)}. "
                    f"Die Kleinunternehmerregelung gilt {st.year} nicht.")
     if st.crossing:
-        out.append(f"Grenze {eur(st.limit)} überschritten mit dem Zahlungseingang zu Rechnung {st.crossing[0]} "
-                   f"am {date.fromisoformat(st.crossing[1]):%d.%m.%Y}. Dieser und alle späteren Umsätze sind "
+        out.append(f"Grenze {eur(st.limit)} überschritten mit dem Umsatz {st.crossing.label} am "
+                   f"{date.fromisoformat(st.crossing.day):%d.%m.%Y}. Dieser und alle späteren Umsätze sind "
                    "steuerpflichtig.")
     elif st.projected > st.limit:
         out.append(f"Eingenommen und offen zusammen {eur(st.projected)}: über der Grenze von {eur(st.limit)}. "
