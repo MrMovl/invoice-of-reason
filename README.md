@@ -85,6 +85,13 @@ Then, from the dev machine:
 It cross-builds for the Pi's architecture, runs the test suite inside that image, ships the image
 over SSH, copies `docker-compose.yml` and starts the stack on `127.0.0.1:8082`.
 
+Deploy only from `main` after the PR is merged. `scripts/deploy-check.sh` refuses uncommitted
+changes and any commit that is not on `origin/main`, because the app records the deployed commit
+and it must stay in git history (GoBD Programmidentität). The repository enforces the rest: PRs
+can only be merged with merge commits (no squash or rebase), merged branches are deleted so stacked
+PRs move onto `main`, and `main` rejects force pushes and deletion. Emergency builds with
+`ALLOW_DIRTY=1` or `ALLOW_UNMERGED=1` are marked `-dirty` / `-unmerged` in the recorded version.
+
 ### Public hostname
 
 In Cloudflare Zero Trust, add a public hostname to the existing tunnel:

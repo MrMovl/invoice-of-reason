@@ -14,14 +14,9 @@ DEPLOY_HOST="${DEPLOY_HOST:-pi}"
 DEPLOY_PATH="${DEPLOY_PATH:-~/invoices}"
 APP_IMAGE="${APP_IMAGE:-invoice-of-reason:latest}"
 
-# GoBD Rz. 154 (Programmidentität): the running version must match a commit in git history.
-# The app records every version change in its database. Uncommitted changes would make the
-# deployed program unprovable, so they are refused unless explicitly allowed.
-if [ -n "$(git status --porcelain --untracked-files=no)" ] && [ "${ALLOW_DIRTY:-}" != "1" ]; then
-  echo "Uncommitted changes. Commit first (or ALLOW_DIRTY=1 for a marked -dirty build)." >&2
-  exit 1
-fi
-APP_VERSION="$(git describe --tags --always --dirty=-dirty) $(git log -1 --format=%cs)"
+# GoBD Rz. 154 (Programmidentität): the running version must match a commit that stays in git
+# history. The app records every version change in its database. See scripts/deploy-check.sh.
+APP_VERSION="$("$(dirname "$0")/scripts/deploy-check.sh")"
 echo ">> Version $APP_VERSION"
 
 map_arch() { sed 's/x86_64/amd64/;s/aarch64/arm64/;s/armv7l/arm\/v7/;s/armv6l/arm\/v6/'; }
