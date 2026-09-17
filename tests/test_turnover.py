@@ -76,8 +76,8 @@ def test_crossing_receipt_is_named(store):
     book.invoice("2.000,00", "2026-03-10", paid="2026-03-20")
     book.invoice("100,00", "2026-04-10", paid="2026-04-20")
     st = turnover.status(conn, founding_year=2026, year=2026)
-    assert st.lost and st.crossing == ("2026-003", "2026-03-20")
-    assert any("Rechnung 2026-003 am 20.03.2026" in w and "alle späteren" in w for w in st.warnings)
+    assert st.lost and (st.crossing.label, st.crossing.day) == ("zu Rechnung 2026-003", "2026-03-20")
+    assert any("zu Rechnung 2026-003 am 20.03.2026" in w and "alle späteren" in w for w in st.warnings)
 
 
 def test_passing_25000_warns_for_next_year_and_previous_year_blocks(store):

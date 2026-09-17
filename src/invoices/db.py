@@ -302,6 +302,28 @@ MIGRATIONS: list[tuple[str, str | Callable[[sqlite3.Connection], None]]] = [
         END;
         """,
     ),
+    (
+        "external receipts for the § 19 turnover limits",
+        # Receipts of the same Unternehmer that are not invoiced here (§ 2 Abs. 1 Satz 2 UStG: one
+        # Unternehmen). Only for the limit monitor; the records of those activities live elsewhere.
+        # Append-only and part of the hash chain; corrections are counter-entries with a note.
+        """
+        CREATE TABLE external_receipts (
+            id          INTEGER PRIMARY KEY,
+            received_on TEXT NOT NULL,              -- ISO date the money was received
+            amount_cents INTEGER NOT NULL CHECK (amount_cents != 0),
+            source      TEXT NOT NULL,              -- where it came from, e.g. "PV-Einspeisung"
+            note        TEXT NOT NULL DEFAULT '',
+            created_at  TEXT NOT NULL,
+            hash        TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX idx_external_receipts_date ON external_receipts(received_on);
+        CREATE TRIGGER external_receipts_append_only_update BEFORE UPDATE ON external_receipts
+        BEGIN SELECT RAISE(ABORT, 'external receipts are append-only'); END;
+        CREATE TRIGGER external_receipts_append_only_delete BEFORE DELETE ON external_receipts
+        BEGIN SELECT RAISE(ABORT, 'external receipts are append-only'); END;
+        """,
+    ),
 ]
 
 
@@ -385,7 +407,7 @@ def _statements(sql: str) -> list[str]:
 # Canonical form: JSON of all columns, sorted, with NULL and '' omitted. New columns that default
 # to NULL or '' therefore leave existing hashes valid; other defaults need a re-seal migration.
 
-CHAINED_TABLES = ("events", "expense_events", "system_events", "control_runs")
+CHAINED_TABLES = ("events", "expense_events", "system_events", "control_runs", "external_receipts")
 RECORD_OF = {"events": ("invoices", "invoice_id"), "expense_events": ("expenses", "expense_id")}
 UNHASHED_RECORD_COLUMNS = ("updated_at",)
 
@@ -436,8 +458,13 @@ def chain_head(conn: sqlite3.Connection, table: str) -> dict:
     return {"id": head["id"], "hash": head["hash"]} if head else {"id": 0, "hash": ""}
 
 
+# The chained tables as of this migration; later ones (external_receipts) are created with their
+# hash column, so this list must stay as it was.
+CHAINED_AT_MIGRATION_2 = ("events", "expense_events", "system_events", "control_runs")
+
+
 def _introduce_hash_chain(conn: sqlite3.Connection) -> None:
-    for table in CHAINED_TABLES:
+    for table in CHAINED_AT_MIGRATION_2:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN hash TEXT NOT NULL DEFAULT ''")
         if table in RECORD_OF:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN state_hash TEXT NOT NULL DEFAULT ''")
@@ -451,7 +478,7 @@ def _introduce_hash_chain(conn: sqlite3.Connection) -> None:
     }
     for name in triggers:
         conn.execute(f"DROP TRIGGER {name}")
-    for table in CHAINED_TABLES:
+    for table in CHAINED_AT_MIGRATION_2:
         prev = ""
         for row in conn.execute(f"SELECT * FROM {table} ORDER BY id").fetchall():
             values = dict(zip(row.keys(), row)) if isinstance(row, sqlite3.Row) else dict(row)
@@ -508,6 +535,14 @@ def last_system_event(conn: sqlite3.Connection, action: str):
     return conn.execute(
         "SELECT * FROM system_events WHERE action = ? ORDER BY id DESC LIMIT 1", (action,)
     ).fetchone()
+
+
+def add_external_receipt(conn: sqlite3.Connection, received_on: str, amount_cents: int,
+                         source: str, note: str = "") -> None:
+    """Append a receipt earned outside this tool; corrections are counter-entries."""
+    with conn:
+        _append(conn, "external_receipts", {"received_on": received_on, "amount_cents": amount_cents,
+                                            "source": source, "note": note, "created_at": now_iso()})
 
 
 def add_control_run(conn: sqlite3.Connection, kind: str, ok: bool, detail: str = "",

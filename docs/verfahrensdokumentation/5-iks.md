@@ -27,6 +27,7 @@ entsprechend der Unternehmensgröße (Rz. 15).
 | Datensicherung | Schutz vor Verlust | täglich automatisch | Kontrollprotokoll (`backup`), Sicherungsdateien |
 | Wiederherstellungstest | Nachweis der Wiederherstellbarkeit | mindestens jährlich, zusätzlich nach Programm- oder Serverwechsel | Kontrollprotokoll (`restore_test`) |
 | Programmidentität | nur freigegebene, versionierte Programmstände | jede Auslieferung | `deploy.sh` (nur eingecheckte Stände, Tests), `system_events` (`version`) |
+| Vollständigkeit der Umsatzgrenze | Auch Umsätze außerhalb des Programms werden berücksichtigt | bei jeder Erfassung, laufend in der Übersicht | Nur anfügbare Einträge mit Herkunft und Datum, Teil der Hash-Kette; Korrekturen als Gegenbuchung mit Begründung |
 | Umsatzgrenzen § 19 UStG | Keine § 19-Rechnungen nach Verlust der Kleinunternehmerregelung | laufend (Rechnungsliste, Formular), bei jeder neuen Rechnung | Anzeige und Warnungen; Sperre mit protokolliertem Grund im Verlauf (`created`, „Umsatzgrenze § 19 UStG“) |
 | Konfigurationshistorie | Nachvollziehbarkeit von Einstellungen | Start, vor jeder Rechnung | `system_events` (`config_changed`) |
 
@@ -44,7 +45,7 @@ Backups-Seite einsehbar.
 | Wiederherstellungstest einer auswärtigen Sicherung | jährlich | Eintrag `restore_test` |
 | Verfahrensdokumentation mit dem eingesetzten Programm abgleichen (Rz. 101) | bei jeder Programmänderung und jährlich | git-Historie dieser Dokumentation |
 | Jahresabschluss: Einnahmen und Ausgaben des Jahres exportieren und mit der EÜR abstimmen | jährlich | Export im Kontrollprotokoll |
-| Umsatzübersicht mit allen Einnahmen außerhalb des Programms abgleichen (Kleinunternehmergrenzen) | vierteljährlich und zum Jahresende | Teil 6 |
+| Einnahmen der Tätigkeiten außerhalb des Programms erfassen und mit deren Aufzeichnungen abgleichen | vierteljährlich und zum Jahresende | Einträge unter „Extern“, Aufzeichnungen nach Teil 6 |
 | Als Anlagegut markierte Belege mit dem Anlagenverzeichnis abgleichen | jährlich vor der EÜR | Filter „Nur Anlagegüter“, Anlagenverzeichnis (Teil 6) |
 | Belege ausländischer Anbieter auf § 13b prüfen, § 13b-Summen mit der Umsatzsteuermeldung abstimmen | je Meldezeitraum, mindestens jährlich | Markierung und Verlauf je Beleg |
 

@@ -146,6 +146,7 @@ Programmidentität. Rules that follow:
 | 18 | Reverse charge flag on expenses (§ 13b UStG) | done (`gobd/reverse-charge`) |
 | 19 | Capital assets excluded from the expense total | done (`gobd/capital-assets`); register and AfA stay outside |
 | 20 | Turnover limit monitor (§ 19 UStG since 2025) | done (`gobd/turnover-limit`) |
+| 22 | External receipts for the § 19 limits | done (`gobd/external-receipts`) |
 | 21 | Hotfix: cancelling a paid invoice erased the receipt | done (`fix/paid-cancellation`); paid → cancelled refused, lost receipts reported |
 | 9 | Cancellation document | done (`gobd/cancellation`), see [CANCELLATION.md](CANCELLATION.md) |
 
@@ -166,9 +167,10 @@ kept privately outside this repository.
 4. **Asset hint on gross amounts.** The hint compares the gross amount with the 800 € net limit, so
    it also appears for net prices between about 673 € and 800 € (at 19 % VAT). Is a net amount field
    worth adding? (#19)
-5. **Income outside the tool.** Does income that is not invoiced through this tool count toward the
-   Gesamtumsatz for the § 19 limits (e.g. other activities of the same Unternehmer)? If so, the
-   monitor needs a manual offset; today it only counts receipts recorded here. (#20)
+5. **Income outside the tool.** *Answered:* yes. For VAT a person has one Unternehmen covering all
+   of their self-employed activities (§ 2 Abs. 1 Satz 2 UStG), so the Gesamtumsatz of § 19 includes
+   receipts not invoiced here. Implemented as append-only external receipts (#22). Still open:
+   whether a given activity is unternehmerisch at all, and which receipts therefore belong in it.
 6. **Receipts vs. open invoices in the projection.** The monitor projects all open invoices into
    the current year and blocks when the projection exceeds the limit. Is blocking on projected
    (not yet received) amounts the right safety margin, or should only receipts block? (#20)

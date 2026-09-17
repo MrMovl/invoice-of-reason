@@ -194,7 +194,25 @@ die Weboberfläche; auf dem Server per Kommandozeile `invoices import-invoice` (
    Nummernkreis und bestätigte Hinweise. Danach ist die Rechnung unveränderbar und kann wie jede
    andere als bezahlt markiert oder storniert werden.
 
-## 2.10 Backups-Seite
+## 2.10 Umsätze außerhalb dieses Programms
+
+Für die Umsatzsteuer hat eine Person ein Unternehmen mit allen selbständigen Tätigkeiten
+(§ 2 Abs. 1 Satz 2 UStG). Für die Grenzen des § 19 UStG zählen deshalb auch Einnahmen, die nicht
+über dieses Programm abgerechnet werden (z. B. Einspeisevergütung, Verkäufe über eine Plattform).
+Ob eine Tätigkeit überhaupt unternehmerisch ist, klärt die Steuerberatung.
+
+Unter „Extern“ werden solche Zahlungseingänge mit Datum, Betrag, Herkunft und optionaler Notiz
+erfasst. Einzutragen ist der vereinnahmte Betrag, nicht der Gewinn; beim Wiederverkauf mit
+Differenzbesteuerung der volle Verkaufserlös, nicht die Marge.
+
+- Die Einträge sind nur anfügbar: Sie können nicht geändert oder gelöscht werden und sind Teil der
+  Hash-Kette. Eine Korrektur ist eine Gegenbuchung mit negativem Betrag und Pflichtnotiz.
+- Sie zählen in der Übersicht der Umsatzgrenze (2.1) für das laufende und das Vorjahr mit und können
+  auch der Umsatz sein, mit dem eine Grenze überschritten wird.
+- Sie sind **keine** Einnahmen der Einnahmen-/Ausgabenübersicht (2.8) und ersetzen keine
+  Aufzeichnung: Die Belege und Aufzeichnungen dieser Tätigkeiten werden außerhalb geführt (Teil 6).
+
+## 2.11 Backups-Seite
 
 Zeigt das Ergebnis der Integritätsprüfung (Prüfsummen, Hash-Kette, Trigger), die vorhandenen
 Sicherungen, das Kontrollprotokoll und erzeugt den Datenexport für die Betriebsprüfung

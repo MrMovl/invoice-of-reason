@@ -35,6 +35,7 @@ TABLES = {
     "expense_events": "Änderungsprotokoll der Eingangsbelege",
     "system_events": "Systemprotokoll: Programmversionen, Schemaänderungen, Konfiguration",
     "control_runs": "Kontrollprotokoll: Integritätsprüfungen, Backups, Wiederherstellungstests, Exporte",
+    "external_receipts": "Außerhalb dieses Programms vereinnahmte Beträge, nur für die Umsatzgrenzen des § 19 UStG",
 }
 FOREIGN_KEYS = {"events": ("invoice_id", "invoices"), "expense_events": ("expense_id", "expenses"),
                 "invoices": ("cancels_invoice_id", "invoices")}
@@ -89,6 +90,8 @@ DESCRIPTIONS = {
     "kind": "Art der Kontrolle",
     "ok": "Ergebnis (1 = erfolgreich, 0 = fehlgeschlagen)",
     "app_version": "Programmversion",
+    "received_on": "Tag des Zahlungseingangs",
+    "source": "Herkunft des Umsatzes (Tätigkeit, Plattform, Abnehmer)",
     "payment_method": "Zahlungsart: bank = Überweisung/Karte, cash = bar, private = privat bezahlt (Einlage), leer = nicht erfasst",
     "reverse_charge": "Steuerschuldnerschaft des Leistungsempfängers: 13b = § 13b UStG, leer = nein bzw. nicht markiert",
     "treatment": "Behandlung der Ausgabe: asset = Anlagegut, wird abgeschrieben (nicht in der Ausgabensumme), leer = sofort abziehbare Ausgabe",
