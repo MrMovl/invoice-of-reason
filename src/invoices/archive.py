@@ -18,7 +18,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from . import db
-from .pdf import InvoiceData, Sender, format_date, render_invoice
+from .pdf import SMALL_BUSINESS_NOTE, InvoiceData, Sender, format_date, render_invoice
 
 NUMBER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
 SCHEME_RE = re.compile(r"^(\d{4})-(\d{3,})$")
@@ -302,6 +302,8 @@ def issue_invoice(
     payload = {
         "invoice": {k: str(v) for k, v in asdict(data).items()},
         "sender": asdict(sender),
+        # Fixed texts printed on this PDF; they change over time (e.g. the § 19 note in 2026).
+        "texts": {"small_business_note": SMALL_BUSINESS_NOTE},
     }
     return _record(
         conn,

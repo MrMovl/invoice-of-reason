@@ -115,6 +115,24 @@ Programmidentität. Rules that follow:
 | 10 | Hash chain, trigger check | done |
 | 11–15 | P3 | open |
 
+### Follow-up review (§ 34a UStDV, § 19 UStG, GoBD 2025)
+
+| # | Item | State |
+|---|---|---|
+| 16 | § 19 note in the 2025 wording (§ 34a Nr. 5 UStDV) | done (`fix/small-business-note`); invoices created before keep the old sentence |
+| 17 | Docs: GoBD second amendment (BMF 14.07.2025), retention since BEG IV | open |
+| 18 | Reverse charge flag on expenses (§ 13b UStG) | open |
+| 19 | Capital assets excluded from the expense total | open |
+| 20 | Turnover limit monitor (§ 19 UStG since 2025) | open |
+| 9 | Cancellation document | design proposal pending |
+
+## Questions for the Steuerberater
+
+Open questions found while implementing; not decided in the code. Business-specific questions are
+kept privately outside this repository.
+
+_None yet from this review._
+
 ## Order
 
 1. #3 logging fixes, #2 Programmidentität, #5 control log (shared schema foundation)

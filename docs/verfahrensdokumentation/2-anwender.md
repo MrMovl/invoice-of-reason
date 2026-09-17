@@ -15,6 +15,12 @@ Beschriftungen im Programm.
    zu diesem Zeitpunkt gültigen Absenderdaten gespeichert. Ab jetzt sind Nummer, Daten, Kunde,
    Leistung, Betrag und PDF unveränderbar.
 
+**Hinweis auf die Kleinunternehmerregelung (§ 34a Nr. 5 UStDV):** Jede Rechnung trägt den Satz
+„Für diese Leistung gilt die Steuerbefreiung für Kleinunternehmer (§ 19 UStG). Es wird keine
+Umsatzsteuer berechnet.“ Rechnungen, die vor dem 18.09.2026 erstellt wurden, tragen den bis dahin
+verwendeten Satz „Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.“ Archivierte PDFs werden nicht
+neu erzeugt; der jeweils gedruckte Satz steht zusätzlich in `payload_json` (Teil 3.2).
+
 **Nummernkreis (Rz. 40, 50):** Eine Nummer, die das Schema verlässt, nicht zum Jahr des
 Rechnungsdatums passt oder eine Lücke erzeugt, wird abgelehnt. Nur mit „Abweichende Nummer bewusst
 verwenden“ und einem Grund wird sie angenommen; der Grund steht im Verlauf der Rechnung. Die

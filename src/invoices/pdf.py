@@ -51,7 +51,14 @@ CW = W - LM - RM  # ~155mm usable
 FOOT_H = 26 * mm
 WAVE_ZONE_Y = FOOT_H + 22 * mm  # top of footer wave transition zone
 
-SMALL_BUSINESS_NOTE = "Gemäß § 19 UStG wird keine Umsatzsteuer berechnet."
+# § 34a Nr. 5 UStDV: an invoice of a Kleinunternehmer must state that the exemption for small
+# businesses applies. Since 2025 § 19 UStG is a tax exemption; wording in use from 2026-09-18,
+# before that "Gemäß § 19 UStG wird keine Umsatzsteuer berechnet." Archived PDFs keep their text.
+SMALL_BUSINESS_NOTE = (
+    "Für diese Leistung gilt die Steuerbefreiung für Kleinunternehmer (§ 19 UStG). "
+    "Es wird keine Umsatzsteuer berechnet."
+)
+NOTE_FONT, NOTE_SIZE, NOTE_LEADING = "Lora-Italic", 8.5, 12
 
 
 class FontsMissingError(RuntimeError):
@@ -181,6 +188,22 @@ def draw_para(c, text, x, y, max_w, style):
     w, h = p.wrapOn(c, max_w, 9999)
     p.drawOn(c, x, y - h)
     return h
+
+
+def draw_note(c, text: str, baseline: float) -> float:
+    """Draw the § 19 note from its first baseline; wrap within the content width if it does not
+    fit on one line. Returns the height taken beyond a single line, so the layout below moves down
+    and the overflow check still sees the real space used."""
+    c.setFillColor(MGRAY)
+    c.setFont(NOTE_FONT, NOTE_SIZE)
+    if c.stringWidth(text, NOTE_FONT, NOTE_SIZE) <= CW:
+        c.drawString(LM, baseline, text)
+        return 0
+    style = ParagraphStyle("note", fontName=NOTE_FONT, fontSize=NOTE_SIZE, textColor=MGRAY,
+                           leading=NOTE_LEADING)
+    # A Paragraph is placed by its top edge; align its first baseline with a single-line note.
+    height = draw_para(c, _para_text(text), LM, baseline + NOTE_SIZE, CW, style)
+    return height - NOTE_LEADING
 
 
 def _para_text(text: str) -> str:
@@ -360,9 +383,7 @@ def render_invoice(data: InvoiceData, sender: Sender) -> bytes:
     cur -= 9 * mm
 
     # ── §19 NOTE ──────────────────────────────────────────────────────────
-    c.setFillColor(MGRAY)
-    c.setFont("Lora-Italic", 8.5)
-    c.drawString(LM, cur, SMALL_BUSINESS_NOTE)
+    cur -= draw_note(c, SMALL_BUSINESS_NOTE, cur)
     cur -= 14 * mm
 
     # ── BANKVERBINDUNG ────────────────────────────────────────────────────

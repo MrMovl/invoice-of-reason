@@ -345,8 +345,9 @@ Format der CSV-Dateien
 Beträge
 -------
 amount_cents ist der Betrag in Cent als ganze Zahl (so gespeichert). amount_eur ist daraus
-abgeleitet: derselbe Betrag in Euro mit Dezimalkomma, z. B. 700,00. Als Kleinunternehmer nach
-§ 19 UStG wird keine Umsatzsteuer ausgewiesen; die Beträge sind Endbeträge.
+abgeleitet: derselbe Betrag in Euro mit Dezimalkomma, z. B. 700,00. Die Ausgangsrechnungen fallen
+unter die Steuerbefreiung für Kleinunternehmer (§ 19 UStG); es wird keine Umsatzsteuer ausgewiesen,
+die Beträge sind Endbeträge.
 
 Verknüpfungen
 -------------
