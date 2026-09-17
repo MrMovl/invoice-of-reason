@@ -48,6 +48,8 @@ def test_upload_rejects_duplicates_and_unknown_types(store):
         upload(s, conn, PNG, "nochmal.png")
     assert e.value.expense_id == exp_id
     with pytest.raises(archive.ArchiveError, match="Nur PDF"):
+        upload(s, conn, b"GIF89a", "x.gif")
+    with pytest.raises(archive.ArchiveError, match="nicht wohlgeformt"):
         upload(s, conn, b"<html>", "x.html")
     row = conn.execute("SELECT * FROM expenses").fetchone()
     assert row["amount_cents"] is None and row["doc_text"] == ""

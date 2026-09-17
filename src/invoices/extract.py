@@ -38,6 +38,14 @@ class Suggestion:
         }
 
 
+def limited(cmd: list[str], max_output: int | None = None) -> list[str]:
+    """Wrap a poppler command in prlimit (if available) to cap memory and written file size."""
+    limit = shutil.which("prlimit")
+    if limit:
+        return [limit, f"--as={MAX_MEMORY}", f"--fsize={max_output or MAX_OUTPUT}", "--", *cmd]
+    return cmd
+
+
 def pdf_text(data: bytes, timeout: float = 20) -> str:
     """Text of the first pages, or '' if there is no text layer or pdftotext is unavailable."""
     exe = shutil.which("pdftotext")
@@ -45,10 +53,7 @@ def pdf_text(data: bytes, timeout: float = 20) -> str:
         return ""
     with tempfile.TemporaryDirectory(prefix="pdftext-") as tmp:
         out = Path(tmp) / "text.txt"
-        cmd = [exe, "-layout", "-enc", "UTF-8", "-f", "1", "-l", str(MAX_PAGES), "-", str(out)]
-        limit = shutil.which("prlimit")
-        if limit:
-            cmd = [limit, f"--as={MAX_MEMORY}", f"--fsize={MAX_OUTPUT}", "--", *cmd]
+        cmd = limited([exe, "-layout", "-enc", "UTF-8", "-f", "1", "-l", str(MAX_PAGES), "-", str(out)])
         try:
             res = subprocess.run(cmd, input=data, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  timeout=timeout, check=False)

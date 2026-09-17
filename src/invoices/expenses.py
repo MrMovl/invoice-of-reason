@@ -1,8 +1,9 @@
-"""Expenses: received invoices and receipts, uploaded as PDF or image.
+"""Expenses: received invoices and receipts, uploaded as PDF, image or e-invoice XML.
 
 The uploaded document is archived like an issued invoice: exclusive create, read-only,
 SHA-256 recorded, never deleted. Its booking data (vendor, date, amount, ...) starts as a
-suggestion read from the PDF text layer and stays correctable; every change is logged.
+suggestion read from the e-invoice XML (plain or embedded in a ZUGFeRD PDF) or else from the PDF
+text layer, and stays correctable; every change is logged.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from . import db, extract
+from . import db, einvoice, extract
 from .archive import (
     ArchiveError,
     quote,
@@ -34,6 +35,7 @@ DOC_TYPES = {
     "pdf": (b"%PDF-", "application/pdf"),
     "jpg": (b"\xff\xd8\xff", "image/jpeg"),
     "png": (b"\x89PNG\r\n\x1a\n", "image/png"),
+    "xml": (None, "application/xml"),  # detected by parsing, see detect_type
 }
 STATUSES = ("paid", "open", "void")
 FIELD_LABELS = {
@@ -55,10 +57,14 @@ class DuplicateError(ArchiveError):
 
 
 def detect_type(data: bytes) -> str:
+    """By content, not by file name. XML counts only if it parses as an e-invoice."""
     for ext, (magic, _mime) in DOC_TYPES.items():
-        if data.startswith(magic):
+        if magic and data.startswith(magic):
             return ext
-    raise ArchiveError("Nur PDF, JPEG oder PNG werden unterstützt.")
+    if einvoice.looks_like_xml(data):
+        einvoice.parse(data)
+        return "xml"
+    raise ArchiveError("Nur PDF, JPEG, PNG oder E-Rechnungen (XRechnung-XML) werden unterstützt.")
 
 
 def mimetype(doc_type: str) -> str:
@@ -87,7 +93,21 @@ def store_upload(
 
     original_filename = original_filename.replace("\\", "/").rsplit("/", 1)[-1][:200]
     text = extract.pdf_text(data) if doc_type == "pdf" else ""
-    suggestion = extract.suggest(text)
+    text_layer = bool(text.strip())
+    # Structured e-invoice data beats text heuristics; a ZUGFeRD PDF stays the archived document.
+    invoice = einvoice.parse(data) if doc_type == "xml" else None
+    if doc_type == "pdf":
+        invoice = einvoice.from_pdf(data)
+    if invoice:
+        suggestion = invoice.suggestion()
+        source = "xml" if doc_type == "xml" else "zugferd"
+        text = text if text_layer else invoice.as_text()
+        extra = {"credit_note": invoice.credit_note, "currency": invoice.currency}
+    else:
+        suggestion = extract.suggest(text)
+        source = "text" if text_layer else "none"
+        extra = {}
+    in_euro = extra.get("currency") in (None, "", "EUR")  # other currencies are not prefilled
     stem = slugify(original_filename.rsplit(".", 1)[0], fallback="Beleg")
     rel_path = f"{today.year}/{today:%Y%m%d}_{stem}_{sha[:8]}.{doc_type}"
     now = db.now_iso()
@@ -95,14 +115,16 @@ def store_upload(
         "vendor": suggestion.vendor[:120],
         "invoice_number": suggestion.invoice_number[:60],
         "expense_date": suggestion.expense_date.isoformat() if suggestion.expense_date else None,
-        "amount_cents": int(suggestion.amount * 100) if suggestion.amount and suggestion.amount < 10_000_000 else None,
+        "amount_cents": int(suggestion.amount * 100)
+        if in_euro and suggestion.amount and suggestion.amount < 10_000_000 else None,
         "doc_path": rel_path,
         "doc_sha256": sha,
         "doc_size": len(data),
         "doc_type": doc_type,
         "original_filename": original_filename,
         "doc_text": text,
-        "suggestion_json": json.dumps({**suggestion.as_dict(), "text_layer": bool(text.strip())},
+        "suggestion_json": json.dumps({**suggestion.as_dict(), **extra, "source": source,
+                                       "text_layer": text_layer},
                                       ensure_ascii=False, sort_keys=True),
         # Counted from the upload, which is never earlier than the document date.
         "retain_until": retain_until(today, retention_years).isoformat(),

@@ -25,13 +25,19 @@ from flask import (
     url_for,
 )
 
-from . import archive, auth, backup, db, expenses, system
+from . import archive, auth, backup, db, einvoice, expenses, system
 from .config import ConfigError, load_sender
 from .pdf import LayoutOverflowError, format_amount, format_date
 
 bp = Blueprint("web", __name__)
 
 STATUS_LABELS = {"open": "Offen", "paid": "Bezahlt", "cancelled": "Storniert"}
+SUGGESTION_SOURCES = {
+    "xml": "E-Rechnung (XML)",
+    "zugferd": "ZUGFeRD/Factur-X (XML im PDF)",
+    "text": "PDF-Text",
+    "none": "–",
+}
 EXPENSE_STATUS_LABELS = {"paid": "Bezahlt", "open": "Offen", "void": "Verworfen"}
 CONTROL_LABELS = {
     "verify": "Integritätsprüfung",
@@ -70,6 +76,20 @@ def eur_filter(cents: int) -> str:
 @bp.app_template_filter("de_date")
 def de_date_filter(iso: str | None) -> str:
     return format_date(date.fromisoformat(iso)) if iso else ""
+
+
+@bp.app_template_filter("money")
+def money_filter(amount: Decimal | None, currency: str = "EUR") -> str:
+    """E-invoice amounts: euro as usual, other currencies with their ISO code."""
+    if amount is None:
+        return "–"
+    text = format_amount(amount)
+    return text if currency in ("EUR", "") else f"{text[:-2]} {currency}"
+
+
+@bp.app_template_filter("de_num")
+def de_num_filter(value: Decimal | None) -> str:
+    return f"{value.normalize():f}".replace(".", ",") if value is not None else ""
 
 
 @bp.app_template_filter("event_label")
@@ -454,8 +474,18 @@ def expense_detail(expense_id: int, form=None):
         (expense_id,)).fetchone()
     suggestion = json.loads(row["suggestion_json"])
     suggestion["amount_cents"] = int(Decimal(suggestion["amount"]) * 100) if suggestion["amount"] else None
+    # Uploads before e-invoice support recorded no source.
+    suggestion.setdefault("source", "text" if suggestion.get("text_layer") else "none")
+    invoice, invoice_error = None, None
+    if row["doc_type"] == "xml":
+        # Readable view (GoBD Rz. 156): rendered from the archived XML itself, not from stored copies.
+        try:
+            invoice = einvoice.parse((settings().expenses_dir / row["doc_path"]).read_bytes())
+        except (OSError, einvoice.EInvoiceError) as e:
+            invoice_error = str(e) if isinstance(e, einvoice.EInvoiceError) else "Datei fehlt im Archiv."
     return render_template("expense.html", exp=row, form=form, events=events, problem=problem,
-                           suggestion=suggestion,
+                           suggestion=suggestion, suggestion_sources=SUGGESTION_SOURCES,
+                           invoice=invoice, invoice_error=invoice_error,
                            categories=_categories(conn), next_review=next_review,
                            today=date.today().isoformat())
 
@@ -486,8 +516,15 @@ def expense_file(expense_id: int):
     path = settings().expenses_dir / row["doc_path"]
     if not path.is_file():
         abort(404, "Datei fehlt im Archiv.")
+    inline = bool(request.args.get("inline"))
+    if inline and row["doc_type"] == "xml":
+        # Shown as source text: a browser must never render uploaded XML (XSLT, XHTML scripts).
+        resp = send_file(path, mimetype="text/plain", as_attachment=False,  # werkzeug adds charset=utf-8
+                         download_name=Path(row["doc_path"]).name)
+        resp.headers["Content-Security-Policy"] = "sandbox; default-src 'none'"
+        return resp
     return send_file(path, mimetype=expenses.mimetype(row["doc_type"]),
-                     as_attachment=not request.args.get("inline"), download_name=Path(row["doc_path"]).name)
+                     as_attachment=not inline, download_name=Path(row["doc_path"]).name)
 
 
 # ── Backups ───────────────────────────────────────────────────────────────
