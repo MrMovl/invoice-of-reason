@@ -31,6 +31,8 @@
   <div><dt>Offen</dt><dd>{{ totals.open|eur }}{% if totals.overdue %} <span class="badge badge-overdue">{{ totals.overdue }} überfällig</span>{% endif %}</dd></div>
 </dl>
 
+{% include "_turnover.html" %}
+
 <section class="cash" aria-labelledby="cash-head">
   <h2 id="cash-head">Einnahmen und Ausgaben {{ cash.year or 'gesamt' }} <small>nach Zahlungsdatum</small></h2>
   <p class="hint">Ausgaben ohne Anlagegüter. Anlagegüter werden über die Nutzungsdauer abgeschrieben (AfA); Anlagenverzeichnis und AfA werden außerhalb des Programms geführt, der Überschuss ist deshalb vor AfA.</p>

@@ -30,6 +30,7 @@ def current_config(settings: Settings) -> dict:
     return {
         "retention_years": settings.retention_years,
         "backup_keep": settings.backup_keep,
+        "founding_year": settings.founding_year,
         "sender": sender,
     }
 

@@ -1,0 +1,16 @@
+<section class="cash turnover" aria-labelledby="turnover-head">
+  <h2 id="turnover-head">Kleinunternehmergrenze {{ turnover.year }} <small>§ 19 UStG, nach Zahlungseingang{% if turnover.is_founding_year %}, Gründungsjahr{% endif %}</small></h2>
+  <dl class="stats">
+    <div><dt>Eingenommen {{ turnover.year }}</dt><dd>{{ turnover.received|eur }}</dd></div>
+    <div><dt>Offene Rechnungen</dt><dd>{{ turnover.open|eur }}</dd></div>
+    <div><dt>Maßgebliche Grenze</dt><dd>{{ turnover.limit|eur }}</dd></div>
+    <div><dt>Spielraum <small>(inkl. offener)</small></dt><dd class="{{ 'negative' if turnover.headroom < 0 }}">{{ turnover.headroom|eur }}</dd></div>
+    {% if not turnover.is_founding_year %}<div><dt>Vorjahr <small>(Grenze 25.000,00 €)</small></dt><dd class="{{ 'negative' if turnover.lost_by_previous_year }}">{{ turnover.previous_year|eur }}</dd></div>{% endif %}
+  </dl>
+  {% if turnover.warnings %}
+  <div class="flash {{ 'flash-error' if turnover.lost or turnover.headroom < 0 else 'flash-warn' }}" role="status">
+    <ul>{% for message in turnover.warnings %}<li>{{ message }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  <p class="hint">Gezählt werden nur die in diesem Programm erfassten Zahlungseingänge. Offene Rechnungen sind als Vorausschau eingerechnet. Keine Steuerberatung.</p>
+</section>
