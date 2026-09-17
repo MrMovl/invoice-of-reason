@@ -112,6 +112,8 @@ are not checked. Only receipts recorded in the tool count.
   country ≠ DE, or wording such as "reverse charge" in the PDF text); it is shown, never applied.
   The expenses page sums marked, non-void expenses per quarter of the selected year by invoice
   date as the tax base, with 19 % as a labelled orientation value. Filter "Nur § 13b UStG".
+  For an invoice in a foreign currency the review form points to the monthly average rate published
+  by the BMF (§ 16 Abs. 6 UStG); the tool stores one EUR amount.
 - Overview on the archive page: income (paid invoices) vs. expenses (paid expenses except assets) by
   payment date, per selected year, which matches the cash basis of an EÜR before AfA. An expense without a paid date counts
   on its invoice date.

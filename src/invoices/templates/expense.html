@@ -67,6 +67,9 @@
       {% endif %}
       <p class="hint">Anlagegüter zählen nicht zu den Ausgaben der Übersicht. Anlagenverzeichnis und AfA werden außerhalb des Programms geführt.</p>
       <label class="check"><input type="checkbox" name="reverse_charge" value="13b" {{ 'checked' if form.reverse_charge == '13b' }}> Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG)</label>
+      {% if suggestion.currency and suggestion.currency != 'EUR' and (form.reverse_charge == '13b' or suggestion.reverse_charge_hint) %}
+      <p class="flash flash-warn">Rechnung in {{ suggestion.currency }} mit § 13b UStG: Die Bemessungsgrundlage ist mit dem monatlichen Durchschnittskurs umzurechnen, den das BMF veröffentlicht (§ 16 Abs. 6 UStG), nicht mit dem Kurs der Karte oder der Bank. Der eingetragene Euro-Betrag sollte danach berechnet sein.</p>
+      {% endif %}
       {% if suggestion.reverse_charge_hint and form.reverse_charge != '13b' %}
       <p class="flash flash-warn">Möglicherweise § 13b UStG: {{ suggestion.reverse_charge_hint }}. Bitte prüfen; die Umsatzsteuer schuldet dann auch ein Kleinunternehmer (§ 13b Abs. 5 UStG).</p>
       {% endif %}

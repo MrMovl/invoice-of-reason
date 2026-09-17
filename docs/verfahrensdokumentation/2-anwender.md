@@ -139,6 +139,12 @@ eintragen, dann „Geprüft, speichern“. „Speichern und nächster“ führt 
   Leistungen von Unternehmen im Ausland (Cloud-Dienste, Software, APIs). Das gilt auch für
   Kleinunternehmer (§ 13b Abs. 5 UStG). Ob ein Fall vorliegt, entscheidet der Unternehmer; ein
   Hinweis aus dem Hochladen (2.5) ist nur ein Anlass zur Prüfung. Änderungen werden protokolliert.
+- **Fremdwährung bei § 13b UStG:** Ist die Rechnung nicht in Euro ausgestellt und als § 13b
+  markiert (oder als solche vorgemerkt), weist das Formular darauf hin, dass die
+  Bemessungsgrundlage mit dem vom BMF veröffentlichten monatlichen Durchschnittskurs umzurechnen ist
+  (§ 16 Abs. 6 UStG) und nicht mit dem Kurs der Karte oder der Bank. Das Programm speichert nur
+  einen Euro-Betrag; er ist nach diesem Kurs einzutragen. Die Summen auf der Ausgabenseite bleiben
+  Orientierungswerte.
 - **E-Rechnungen** werden auf der Detailseite als lesbare Rechnung angezeigt (Rz. 157);
   „Herunterladen“ liefert die Originaldatei. Gutschriften und Fremdwährungen sind gekennzeichnet;
   bei Fremdwährung ist der Euro-Betrag von Hand einzutragen.
