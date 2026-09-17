@@ -5,6 +5,10 @@ Ausgangsrechnungen erstellt und archiviert sowie Eingangsbelege erfasst, geprüf
 werden. Sie richtet sich an einen sachverständigen Dritten (Rz. 148) und beschreibt, wie die
 Ordnungsvorschriften der §§ 145–147 AO im Verfahren umgesetzt sind.
 
+> **Hinweis:** Diese Dokumentation beschreibt das Verfahren eines einzelnen Betriebs. Sie ist von
+> keiner Steuerberatung, Prüfstelle oder Finanzbehörde geprüft und keine Vorlage mit
+> Gewähr für andere Nutzer. Siehe Haftungsausschluss in der [README](../../README.md#disclaimer).
+
 ## Gliederung (Rz. 153)
 
 | Teil | Inhalt | Ort |

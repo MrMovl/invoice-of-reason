@@ -12,6 +12,33 @@ See [docs/PLAN.md](docs/PLAN.md) for architecture and decisions, [docs/BACKUP.md
 for backups and restore, [docs/GOBD.md](docs/GOBD.md) for the GoBD compliance plan,
 [docs/verfahrensdokumentation/](docs/verfahrensdokumentation/README.md) for the Verfahrensdokumentation (German).
 
+## Disclaimer
+
+**This is a personal project, built for one specific business. It is not tax or legal advice
+and not a certified or audited bookkeeping product.**
+
+- No tax advisor, auditor, tax authority or certification body has reviewed, tested or approved
+  this software, its GoBD measures or its documentation. The GoBD themselves state that the tax
+  authorities issue no certificates for software and that third-party certificates are not
+  binding on them (Rz. 179–181).
+- The GoBD analysis (`docs/GOBD.md`) and the Verfahrensdokumentation are the maintainer's own
+  reading of the rules for their own situation. They may be incomplete, wrong or outdated, and
+  they do not fit other businesses without review.
+- Under the GoBD the taxpayer alone is responsible for the proper keeping of books and records
+  and for the procedures used, even when software or third parties are involved (Rz. 21). If you
+  use this project for your own invoices or bookkeeping, you do so entirely at your own risk.
+  Have your setup checked by a tax advisor.
+- The software is provided "as is", without warranty of any kind, as stated in the
+  [LICENSE](LICENSE). The authors and contributors accept no liability for incorrect invoices,
+  lost or unusable records, non-compliant bookkeeping, tax consequences or any other damage
+  resulting from its use.
+
+> **Haftungsausschluss:** Privates Projekt für einen einzelnen Betrieb, keine Steuer- oder
+> Rechtsberatung. Software, GoBD-Umsetzung und Verfahrensdokumentation wurden von keiner
+> Steuerberatung, Prüfstelle oder Finanzbehörde geprüft, testiert oder freigegeben. Für die
+> Ordnungsmäßigkeit der Buchführung ist allein der Steuerpflichtige verantwortlich (GoBD Rz. 21).
+> Nutzung auf eigenes Risiko; keine Gewährleistung und keine Haftung, siehe [LICENSE](LICENSE).
+
 ## Local development
 
 Needs `pdftotext` for expense suggestions (`apt install poppler-utils`, `pacman -S poppler`).
