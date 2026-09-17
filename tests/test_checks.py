@@ -197,11 +197,12 @@ def test_invoice_payment_method_required_and_cleared(store):
 def test_payment_method_migration_on_existing_database(env, tmp_path, monkeypatch):
     path = tmp_path / "old.sqlite3"
     conn = db.connect(path)
+    number = next(i for i, (desc, _sql) in enumerate(db.MIGRATIONS, start=1)
+                  if desc == "payment_method on invoices and expenses")
     with monkeypatch.context() as m:
-        m.setattr(db, "MIGRATIONS", db.MIGRATIONS[:-1])
+        m.setattr(db, "MIGRATIONS", db.MIGRATIONS[:number - 1])
         db.init_db(conn)
-    previous = len(db.MIGRATIONS) - 1
-    assert db.schema_version(conn) == previous
+    assert db.schema_version(conn) == number - 1
     conn.execute("""INSERT INTO invoices (number, issue_date, service_date, customer_name, title,
                     amount_cents, status, paid_date, source, pdf_path, pdf_sha256, pdf_size, payload_json,
                     retain_until, created_at, updated_at)
@@ -216,9 +217,8 @@ def test_payment_method_migration_on_existing_database(env, tmp_path, monkeypatc
     assert db.schema_version(conn) == len(db.MIGRATIONS)
     assert conn.execute("SELECT payment_method FROM invoices").fetchone()[0] == ""
     assert conn.execute("SELECT payment_method FROM expenses").fetchone()[0] == ""
-    assert conn.execute("SELECT detail FROM system_events WHERE action = 'schema_migration' "
-                        "ORDER BY id DESC").fetchone()[0] == \
-        f"{len(db.MIGRATIONS)}: payment_method on invoices and expenses"
+    assert f"{number}: payment_method on invoices and expenses" in [r[0] for r in conn.execute(
+        "SELECT detail FROM system_events WHERE action = 'schema_migration'")]
 
     conn.execute("UPDATE invoices SET payment_method = 'bank'")  # not covered by the immutable trigger
     with pytest.raises(sqlite3.IntegrityError, match="CHECK"):

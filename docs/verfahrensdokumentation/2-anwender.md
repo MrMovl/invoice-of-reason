@@ -57,7 +57,12 @@ Freitext zu einer Rechnung. Jede Änderung wird mit altem und neuem Text protoko
    - Sonstiges PDF mit Textebene: Werte aus dem Text (heuristisch).
    - Scan oder Foto ohne Text: keine Vorschläge.
    Die Quelle wird unter „Automatisch erkannt“ angezeigt.
-4. Der Beleg hat den Hinweis „Zu prüfen“, bis er einmal gespeichert wurde.
+4. Hinweis auf § 13b UStG: Das Programm merkt einen möglichen Fall der Steuerschuldnerschaft des
+   Leistungsempfängers vor, wenn eine E-Rechnung die Steuerkategorie AE enthält, der
+   Rechnungssteller laut E-Rechnung nicht in Deutschland sitzt oder der Belegtext Formulierungen
+   wie „Reverse charge“ oder „Steuerschuldnerschaft des Leistungsempfängers“ enthält. Der Hinweis
+   wird bei der Prüfung angezeigt; das Feld selbst wird nie automatisch gesetzt.
+5. Der Beleg hat den Hinweis „Zu prüfen“, bis er einmal gespeichert wurde.
 
 ## 2.6 Beleg prüfen und kontieren
 
@@ -69,6 +74,11 @@ eintragen, dann „Geprüft, speichern“. „Speichern und nächster“ führt 
 - **Zahlungsart:** „Überweisung/Karte“, „Bar“ oder „Privat bezahlt (Einlage)“ für Ausgaben, die aus
   privaten Mitteln bezahlt wurden.
 - **Zahlungsdatum** leer bedeutet: bezahlt am Rechnungsdatum.
+- **Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG):** ankreuzen, wenn der Leistende die
+  Umsatzsteuer nicht selbst berechnet und sie deshalb der Unternehmer schuldet, typischerweise bei
+  Leistungen von Unternehmen im Ausland (Cloud-Dienste, Software, APIs). Das gilt auch für
+  Kleinunternehmer (§ 13b Abs. 5 UStG). Ob ein Fall vorliegt, entscheidet der Unternehmer; ein
+  Hinweis aus dem Hochladen (2.5) ist nur ein Anlass zur Prüfung. Änderungen werden protokolliert.
 - **E-Rechnungen** werden auf der Detailseite als lesbare Rechnung angezeigt (Rz. 157);
   „Herunterladen“ liefert die Originaldatei. Gutschriften und Fremdwährungen sind gekennzeichnet;
   bei Fremdwährung ist der Euro-Betrag von Hand einzutragen.
@@ -89,6 +99,12 @@ Beleg bleibt archiviert und zählt nicht zu den Ausgaben.
 
 - Rechnungsliste: Filter nach Jahr, Status, Suche in Nummer, Kunde, Leistung; Summen; überfällige
   Rechnungen markiert; Einnahmen und Ausgaben je Jahr nach Zahlungsdatum.
+- § 13b UStG (Ausgabenseite): Für das gewählte Jahr (ohne Auswahl das laufende) je Quartal und für
+  das Jahr die Summe der als § 13b markierten, nicht verworfenen Belege als Bemessungsgrundlage,
+  zugeordnet nach Rechnungsdatum als Näherung für den Leistungszeitraum, dazu 19 % als
+  gekennzeichneter Orientierungswert. Das Programm berechnet keine Steuer und erstellt keine
+  Anmeldung. Die an das Finanzamt gezahlte Steuer wird anschließend als gewöhnliche Ausgabe erfasst.
+- Ausgabenliste: Filter „Nur § 13b UStG“; markierte Belege tragen das Kennzeichen „§ 13b“.
 - Ausgabenliste: Filter nach Jahr (Zahlungsdatum, sonst Rechnungsdatum, sonst Upload), Status,
   Kategorie, „zu prüfen“; Volltextsuche in Lieferant, Nummer, Kategorie, Notiz, Dateiname und
   Belegtext.

@@ -18,6 +18,10 @@
       {% for c in categories %}<option value="{{ c }}" {{ 'selected' if c == category }}>{{ c }}</option>{% endfor %}
     </select>
     {% endif %}
+    <select name="rc" aria-label="Steuerschuldnerschaft">
+      <option value="">Alle Belege</option>
+      <option value="1" {{ 'selected' if rc }}>Nur § 13b UStG</option>
+    </select>
     <input type="search" name="q" value="{{ q }}" placeholder="Lieferant, Nummer, Text" aria-label="Suche">
     <button class="btn" type="submit">Filtern</button>
   </form>
@@ -38,6 +42,22 @@
   <div><dt>Offen</dt><dd>{{ totals.open|eur }}</dd></div>
   <div><dt>Zu prüfen</dt><dd>{% if totals.to_review %}<a href="{{ url_for('web.expense_list', review=1) }}">{{ totals.to_review }}</a>{% if late %} <span class="badge badge-late">{{ late|length }} über {{ review_days }} Tage</span>{% endif %}{% else %}0{% endif %}</dd></div>
 </dl>
+
+<section class="cash" aria-labelledby="rc-head">
+  <h2 id="rc-head">§ 13b UStG {{ rc_summary.year }} <small>Steuerschuldnerschaft des Leistungsempfängers, nach Rechnungsdatum</small></h2>
+  <div class="table-wrap card">
+  <table>
+    <thead><tr><th>Quartal</th><th class="num">Bemessungsgrundlage</th><th class="num">{{ rc_summary.rate_percent }} % zur Orientierung</th></tr></thead>
+    <tbody>
+    {% for q in rc_summary.quarters %}
+      <tr><td>Q{{ q.quarter }}</td><td class="num">{{ q.base|eur }}</td><td class="num">{{ q.tax_orientation|eur }}</td></tr>
+    {% endfor %}
+      <tr><td><strong>Jahr</strong> <small>({{ rc_summary.count }} Belege)</small></td><td class="num"><strong>{{ rc_summary.base|eur }}</strong></td><td class="num"><strong>{{ rc_summary.tax_orientation|eur }}</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="hint">Summe der als § 13b markierten, nicht verworfenen Belege. Die {{ rc_summary.rate_percent }} % sind nur ein Orientierungswert (Regelsteuersatz), keine Steuerberechnung; der richtige Satz hängt von der Leistung ab. Als Kleinunternehmer schuldet man diese Steuer trotzdem und meldet sie dem Finanzamt (§ 13b Abs. 5 UStG). Die an das Finanzamt gezahlte Steuer ist dann eine gewöhnliche Ausgabe. Das Datum ist das Rechnungsdatum als Näherung für den Leistungszeitraum.</p>
+</section>
 
 {% if review %}
 <p class="flash flash-warn">Nur ungeprüfte Belege. <a href="{{ url_for('web.expense_list') }}">Alle anzeigen</a></p>
@@ -61,6 +81,7 @@
       <td class="num">{{ r.amount_cents|eur if r.amount_cents else '–' }}</td>
       <td>
         <span class="badge badge-{{ r.status }}">{{ expense_status_labels[r.status] }}</span>
+        {% if r.reverse_charge == '13b' %}<span class="badge badge-open" title="Steuerschuldnerschaft des Leistungsempfängers">§ 13b</span>{% endif %}
         {% if r.id in late %}<span class="badge badge-late">über {{ review_days }} Tage ungeprüft</span>
         {% elif not r.reviewed and r.status != 'void' %}<span class="badge badge-overdue">Zu prüfen</span>{% endif %}
       </td>

@@ -70,6 +70,11 @@ Reachable at `invoices.example.com` behind a login.
   Uploads unreviewed for more than 10 days are marked "über 10 Tage ungeprüft" (GoBD Rz. 47).
 - Saving requires a category, and for paid expenses a payment method (bank/card, cash, paid
   privately), unless the expense is voided (GoBD Rz. 50, 79).
+- Reverse charge (§ 13b UStG): `reverse_charge` ('' | '13b') is set by hand when reviewing. At upload
+  `suggestion_json.reverse_charge_hint` records why it may apply (e-invoice VAT category AE, seller
+  country ≠ DE, or wording such as "reverse charge" in the PDF text); it is shown, never applied.
+  The expenses page sums marked, non-void expenses per quarter of the selected year by invoice
+  date as the tax base, with 19 % as a labelled orientation value. Filter "Nur § 13b UStG".
 - Overview on the archive page: income (paid invoices) vs. expenses (paid expenses) by payment date,
   per selected year, which matches the cash basis of an EÜR. An expense without a paid date counts
   on its invoice date.

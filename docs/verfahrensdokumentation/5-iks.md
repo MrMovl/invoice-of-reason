@@ -14,6 +14,8 @@ entsprechend der Unternehmensgröße (Rz. 15).
 | Duplikaterkennung | keine Doppelerfassung von Belegen | beim Hochladen | identische Datei (SHA-256) wird abgelehnt |
 | Prüfpflicht | Richtigkeit automatisch gelesener Werte | jeder Beleg | Status „zu prüfen“ bis zum Speichern; Verlaufseintrag `reviewed` |
 | Fristüberwachung | zeitgerechte Erfassung | laufend | Markierung „über 10 Tage ungeprüft“, überfällige Rechnungen |
+| § 13b-Hinweis | Erkennen von Eingangsleistungen mit Steuerschuldnerschaft des Leistungsempfängers | beim Hochladen, Anzeige bei der Prüfung | Hinweis mit Grund in `suggestion_json`; Entscheidung im Verlauf (`Steuerschuldnerschaft § 13b UStG`) |
+| § 13b-Übersicht | Vollständigkeit der zu meldenden § 13b-Beträge | laufend auf der Ausgabenseite | Summen je Quartal und Jahr; Abgleich mit der abgegebenen Meldung (5.2) |
 | Pflichtangaben bei Storno/Verwerfen | Nachvollziehbarkeit | bei jeder Stornierung/Verwerfung | Grund im Verlauf |
 | Unveränderbarkeit | Schutz vor Verfälschung | ständig | Trigger, Schreibschutz, Protokoll (Teil 3.3) |
 | Integritätsprüfung | Erkennen von Verfälschung oder Verlust | bei jeder Detailansicht (Datei), Backups-Seite, jeder Sicherung, jedem Export, manuell | Kontrollprotokoll (`verify`, `backup`, `export`) |
@@ -36,6 +38,7 @@ Backups-Seite einsehbar.
 | Wiederherstellungstest einer auswärtigen Sicherung | jährlich | Eintrag `restore_test` |
 | Verfahrensdokumentation mit dem eingesetzten Programm abgleichen (Rz. 101) | bei jeder Programmänderung und jährlich | git-Historie dieser Dokumentation |
 | Jahresabschluss: Einnahmen und Ausgaben des Jahres exportieren und mit der EÜR abstimmen | jährlich | Export im Kontrollprotokoll |
+| Belege ausländischer Anbieter auf § 13b prüfen, § 13b-Summen mit der Umsatzsteuermeldung abstimmen | je Meldezeitraum, mindestens jährlich | Markierung und Verlauf je Beleg |
 
 Die tatsächlich durchgeführten organisatorischen Kontrollen, soweit nicht automatisch
 protokolliert, werden in Teil 6 festgehalten.

@@ -87,6 +87,7 @@ DESCRIPTIONS = {
     "ok": "Ergebnis (1 = erfolgreich, 0 = fehlgeschlagen)",
     "app_version": "Programmversion",
     "payment_method": "Zahlungsart: bank = Überweisung/Karte, cash = bar, private = privat bezahlt (Einlage), leer = nicht erfasst",
+    "reverse_charge": "Steuerschuldnerschaft des Leistungsempfängers: 13b = § 13b UStG, leer = nein bzw. nicht markiert",
     "hash": "SHA-256 der Hash-Kette: Hash des vorigen Eintrags + Inhalt dieses Eintrags (siehe README)",
     "state_hash": "SHA-256 des Datensatzes (Rechnung bzw. Beleg) nach dieser Änderung",
 }
@@ -371,6 +372,11 @@ expenses.status:  paid = bezahlt, open = offen, void = verworfen (z. B. Fehl-Upl
                   bzw. im Änderungsprotokoll)
 invoices.source:  generated = im Programm erstellt, imported = vor Einführung des Programms
                   erstellte Rechnung, Original-PDF unverändert übernommen (Grund im Verlauf)
+expenses.reverse_charge:
+                  13b = Eingangsleistung mit Steuerschuldnerschaft des Leistungsempfängers
+                  (§ 13b UStG, bei der Prüfung von Hand gesetzt), leer = nein bzw. nicht markiert.
+                  Einträge vor Einführung des Feldes sind leer. Die Umsatzsteuer darauf ist nicht
+                  in amount_cents enthalten.
 
 Einträge in den Protokollen (action bzw. kind)
 ----------------------------------------------
