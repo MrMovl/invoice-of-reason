@@ -61,8 +61,12 @@ Technische Details zu Befehlen: `README.md`, `docs/BACKUP.md`, `docs/EXPORT.md` 
 - **Z1, unmittelbarer Zugriff:** Der Prüfer erhält am Bildschirm Einsicht in die Weboberfläche
   (Listen, Filter, Suche, Detailseiten mit Verlauf, Anzeige aller Rechnungen und Belege). Der
   Unternehmer bedient das Programm; ein eigenes Nur-Lese-Konto gibt es derzeit nicht.
-- **Z2, mittelbarer Zugriff:** Auswertungen mit den vorhandenen Filtern und Suchen nach Vorgabe des
-  Prüfers.
+- **Z2, mittelbarer Zugriff (Rz. 166 in der Fassung vom 14.07.2025):** Der Unternehmer wertet die
+  Daten mit den vorhandenen Filtern und Suchen nach Vorgabe des Prüfers aus und stellt das Ergebnis
+  entweder am Bildschirm zur Einsicht (Nur-Lesezugriff) oder in maschinell auswertbarer Form zur
+  Verfügung. Maschinell auswertbar ausgeben kann das Programm derzeit nur den Export (Z3), ganz
+  oder je Jahr; gefilterte Auswertungen (z. B. eine Kategorie) werden daraus erstellt, nicht direkt
+  im Programm.
 - **Z3, Datenüberlassung:** `invoices export [--year JJJJ]` bzw. Backups-Seite, Abschnitt
   „Datenexport für die Betriebsprüfung“. Ergebnis: ZIP-Datei mit
   - je einer CSV-Datei pro Tabelle (Kopfzeile, Semikolon, Dezimalkomma, CR LF, UTF-8, alle Spalten

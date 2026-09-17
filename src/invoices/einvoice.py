@@ -1,7 +1,8 @@
 """Received e-invoices: XRechnung / EN 16931 in UBL 2.1 or UN/CEFACT CII syntax.
 
-The XML is the invoice (GoBD Rz. 125, 131): it is archived byte for byte and only read here,
-never converted. Reading gives booking suggestions and a readable view (Rz. 156). ZUGFeRD and
+The XML is the invoice (GoBD Rz. 118, 119, 125, 131 as amended 14.07.2025): it is archived byte
+for byte and only read here, never converted. For hybrid invoices the GoBD only require the XML;
+the whole PDF is kept anyway, in case it carries extra tax-relevant information. Reading gives booking suggestions and a readable view (Rz. 156). ZUGFeRD and
 Factur-X PDFs carry the same CII XML as an attachment, which `pdfdetach` extracts.
 
 Uploads come from third parties. ElementTree on Python >= 3.11 (bundled expat) resolves no

@@ -1,7 +1,9 @@
 # GoBD compliance plan
 
 Gap analysis of this tool against the GoBD (BMF-Schreiben vom 28.11.2019, BStBl I S. 1269, geändert
-durch BMF-Schreiben vom 11.03.2024). "Rz." refers to the Randziffern of the GoBD. This is an
+durch BMF-Schreiben vom 11.03.2024, BStBl I S. 374, und vom 14.07.2025, BStBl 2025 I S. 1502,
+anzuwenden ab 14.07.2025, Rz. 185). "Rz." refers to the Randziffern of the GoBD in that current
+version. This is an
 engineering reading of the text, not tax advice: have a Steuerberater look at the finished
 Verfahrensdokumentation once.
 
@@ -59,10 +61,16 @@ principles do not go away.
 
 ### P2: strongly recommended
 
-7. **E-invoices: receive** (Rz. 125, 131). Receiving B2B e-invoices is mandatory since 1.1.2025.
-   Accept XRechnung/UBL/CII XML uploads, store them unchanged, read booking suggestions from the
-   XML, show a readable view. ZUGFeRD/Factur-X PDFs keep their embedded XML already (no
-   conversion); read suggestions from it too. Reading ZUGFeRD is groundwork for issuing it (#15).
+7. **E-invoices: receive** (Rz. 118, 119, 125, 127, 131 as amended 14.07.2025). Receiving B2B
+   e-invoices is mandatory since 1.1.2025. Accept XRechnung/UBL/CII XML uploads, store them
+   unchanged, read booking suggestions from the XML, show a readable view. ZUGFeRD/Factur-X PDFs
+   keep their embedded XML already (no conversion); read suggestions from it too. Reading ZUGFeRD
+   is groundwork for issuing it (#15).
+   Since 14.07.2025 keeping the structured part of an e-invoice is sufficient; the human-readable
+   part of a hybrid invoice (the PDF of a ZUGFeRD invoice) must only be kept if it holds additional
+   or different tax-relevant information (Rz. 119, 131). For structured data only a match in
+   content, not an image match, is required (Rz. 118). The tool keeps the whole received file,
+   which is more than required and covers the case where the PDF carries extra information.
 8. **Completeness and timeliness checks** (Rz. 40, 46–50, 79).
    - Gap analysis of invoice numbers per year, warning for numbers outside `YYYY-NNN`.
    - Warning for unreviewed expenses older than 10 days.
@@ -88,6 +96,20 @@ principles do not go away.
     required once the business leaves § 19 (together with VAT support). Needs a spike: PDF/A-3
     from reportlab plus the `factur-x` library on the armv7 image.
 
+## Retention
+
+- Since 1.1.2025 (BEG IV) Buchungsbelege, including invoices, are kept 8 years (§ 147 Abs. 3 AO,
+  § 14b UStG). Books and records (Aufzeichnungen) stay at 10 years.
+- The tool keeps one uniform period, `INVOICES_RETENTION_YEARS`, default 10, as a deliberate
+  conservative choice: the database rows are the records (Grundaufzeichnungen) belonging to the
+  documents, documents and records stay together, the Verfahrensdokumentation and logs needed to
+  understand them are covered, and one rule avoids mistakes about which document is which kind.
+- The period starts at the end of the calendar year (§ 147 Abs. 4 AO): of the invoice date for
+  invoices, of the upload for expense documents.
+- `retain_until` is a minimum, not an end date: the retention period does not end while the
+  documents still matter for taxes whose assessment period is open (§ 147 Abs. 3 AO). The tool
+  never deletes anything, so nothing happens automatically on that date.
+
 ## Public repository
 
 The GoBD do not require the code to be secret. Integrity comes from triggers, hashes, the hash
@@ -106,7 +128,7 @@ Programmidentität. Rules that follow:
 | 1 | Verfahrensdokumentation | public part 1–5 and template for the private part in `docs/verfahrensdokumentation/`; private part 6 to be filled in |
 | 2 | Programmidentität | done |
 | 3 | Complete change log | done |
-| 4 | Z3 export | done; `index.xml` still to be validated against the official DTD or by a test import |
+| 4 | Z3 export | done; `index.xml` validated against the official DTD in the tests, a test import into IDEA is still open |
 | 5 | Control log, restore test | done |
 | 6 | Off-site backup | open, needs a decision |
 | 7 | Receive e-invoices | done |
@@ -120,7 +142,7 @@ Programmidentität. Rules that follow:
 | # | Item | State |
 |---|---|---|
 | 16 | § 19 note in the 2025 wording (§ 34a Nr. 5 UStDV) | done (`fix/small-business-note`); invoices created before keep the old sentence |
-| 17 | Docs: GoBD second amendment (BMF 14.07.2025), retention since BEG IV | open |
+| 17 | Docs: GoBD second amendment (BMF 14.07.2025), retention since BEG IV | done (`gobd/legal-state-2025`); no code change needed |
 | 18 | Reverse charge flag on expenses (§ 13b UStG) | open |
 | 19 | Capital assets excluded from the expense total | open |
 | 20 | Turnover limit monitor (§ 19 UStG since 2025) | open |

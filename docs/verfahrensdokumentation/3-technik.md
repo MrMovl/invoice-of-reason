@@ -46,7 +46,7 @@ Alle Zeitstempel (`created_at`, `updated_at`, `at`) sind UTC im Format ISO 8601
 | `pdf_path` | Pfad unter `data/archive/` | nein |
 | `pdf_sha256`, `pdf_size` | Prüfsumme und Größe der PDF | nein |
 | `payload_json` | erstellt: vollständige Eingabedaten, Absenderdaten (Name, Anschrift, Steuernummer, Bankverbindung) und die fest gedruckten Texte (`texts.small_business_note`, ab 18.09.2026) zum Erstellungszeitpunkt; importiert: Grund, ursprünglicher Dateiname, bestätigte Hinweise, Programmversion (Absenderdaten stehen nur in der Original-PDF) | nein |
-| `retain_until` | Ende der Aufbewahrung (31.12. des Rechnungsjahres + eingestellte Jahre) | nein |
+| `retain_until` | Frühestes Ende der Aufbewahrung (31.12. des Rechnungsjahres + eingestellte Jahre), Mindestfrist (3.6) | nein |
 | `created_at`, `updated_at` | Erfassung, letzte Änderung | `updated_at` ja |
 
 ### expenses – Eingangsbelege (ein Datensatz je hochgeladener Datei)
@@ -70,7 +70,7 @@ Alle Zeitstempel (`created_at`, `updated_at`, `at`) sind UTC im Format ISO 8601
 | `original_filename` | Dateiname beim Hochladen | nein |
 | `doc_text` | Textebene der PDF bzw. lesbare Fassung der E-Rechnung, für die Suche | nein |
 | `suggestion_json` | beim Hochladen gelesene Werte und deren Quelle (`xml`, `zugferd`, `text`, `none`) | nein |
-| `retain_until` | Ende der Aufbewahrung (31.12. des Upload-Jahres + eingestellte Jahre) | nein |
+| `retain_until` | Frühestes Ende der Aufbewahrung (31.12. des Upload-Jahres + eingestellte Jahre), Mindestfrist (3.6) | nein |
 | `created_at`, `updated_at` | Erfassung (Hochladen), letzte Änderung | `updated_at` ja |
 
 ### events, expense_events – Verlauf je Rechnung bzw. Beleg
@@ -157,16 +157,35 @@ Wer Zugriff auf die Datenbankdatei hat, könnte Trigger entfernen. Deshalb gilt 
 - Buchungsdatum im Sinne der Einnahmen-Überschuss-Rechnung ist das Zahlungsdatum (`paid_date`);
   bei Belegen ohne Zahlungsdatum das Rechnungsdatum, ohne beides der Tag des Hochladens.
 
-## 3.6 Formate und Aufbewahrung (Rz. 118–135)
+## 3.6 Formate und Aufbewahrung (Rz. 113–144)
 
-- Ausgangsrechnungen: PDF mit Textebene, wie versandt (Ursprungsformat).
-- Eingangsbelege: im Empfangsformat, byteweise unverändert. Keine Konvertierung, keine
-  Bildbearbeitung, keine OCR. E-Rechnungen als XML bleiben XML; ZUGFeRD-PDFs behalten die
-  eingebettete XML-Datei. Die lesbare Anzeige wird bei jedem Aufruf aus dem Original erzeugt.
-- Daten: SQLite-Datenbank. Maschinelle Auswertbarkeit über den Export (Teil 4.6).
-- Aufbewahrungsfrist je Datensatz in `retain_until`, standardmäßig 10 Jahre ab Jahresende (deckt
-  10 Jahre für Aufzeichnungen und 8 Jahre für Buchungsbelege ab). Es wird nichts automatisch
-  gelöscht.
+Maßgeblich sind die GoBD in der Fassung vom 14.07.2025.
+
+- Ausgangsrechnungen: PDF mit Textebene, wie versandt (Ursprungsformat, Rz. 133). Nach Rz. 76 wäre
+  bei einem Fakturierungsprogramm unter Voraussetzungen auch ein jederzeit erzeugbares, inhaltlich
+  identisches Mehrstück zulässig; das Programm speichert dennoch das versandte PDF und erzeugt es
+  nie neu.
+- Eingangsbelege: im Empfangsformat, byteweise unverändert (Rz. 131). Keine Konvertierung, keine
+  Bildbearbeitung, keine OCR.
+- E-Rechnungen: XML-Dateien bleiben XML; ZUGFeRD-/Factur-X-PDFs werden vollständig mit der
+  eingebetteten XML-Datei aufbewahrt. Nach Rz. 119 und 131 genügt bei E-Rechnungen die
+  Aufbewahrung des strukturierten Teils; der menschenlesbare Teil einer hybriden Rechnung ist nur
+  aufzubewahren, wenn er zusätzliche oder abweichende steuerlich bedeutsame Informationen enthält
+  (z. B. Buchungsvermerke). Das Programm bewahrt immer die ganze empfangene Datei auf und deckt
+  diesen Fall damit ab. Für strukturierte Daten ist inhaltliche, nicht bildliche Übereinstimmung
+  gefordert (Rz. 118); die lesbare Anzeige wird bei jedem Aufruf aus dem Original erzeugt.
+- Daten: SQLite-Datenbank. E-Rechnungen und die Tabellen sind strukturierte Dateien im Sinne von
+  Rz. 127; maschinelle Auswertbarkeit über den Export (Teil 4.6), der auch die XML-Dateien enthält.
+- Aufbewahrungsfrist: Seit 1.1.2025 (BEG IV) gelten für Buchungsbelege einschließlich Rechnungen
+  8 Jahre (§ 147 Abs. 3 AO, § 14b UStG), für Bücher und Aufzeichnungen weiterhin 10 Jahre. Das
+  Programm verwendet bewusst einheitlich 10 Jahre (`INVOICES_RETENTION_YEARS`): Die Datensätze
+  sind die Aufzeichnungen zu den Belegen, Beleg und Aufzeichnung bleiben zusammen, Protokolle und
+  Verfahrensdokumentation sind abgedeckt, und eine einheitliche Frist vermeidet Fehler bei der
+  Einordnung. Die Frist beginnt mit dem Schluss des Kalenderjahres (§ 147 Abs. 4 AO).
+- `retain_until` ist eine Mindestfrist, kein Löschdatum: Die Aufbewahrungsfrist läuft nicht ab,
+  soweit und solange die Unterlagen für Steuern von Bedeutung sind, deren Festsetzungsfrist noch
+  nicht abgelaufen ist (§ 147 Abs. 3 AO). Das Programm löscht nichts, auch nicht nach diesem
+  Datum.
 - Kryptografie: Keine Verschlüsselung der Daten im Programm. Verschlüsselung der auswärtigen
   Sicherung siehe Teil 6 (Schlüssel für die gesamte Frist verfügbar halten, Rz. 134).
 

@@ -67,5 +67,5 @@ Browser ──HTTPS──> Cloudflare Tunnel ──> Server (Docker)
 | Belegwesen (Rz. 61–81) | Beleg und Buchungsdaten über die Belegnummer (id) verknüpft | 3 |
 | IKS (Rz. 100–102) | Automatische und manuelle Kontrollen, Kontrollprotokoll | 5 |
 | Datensicherheit (Rz. 103–106) | Zugriffsschutz, tägliche geprüfte Sicherung, Wiederherstellungstest | 4 |
-| Aufbewahrung (Rz. 113–144) | Empfangsformat, keine Konvertierung, Aufbewahrungsfrist je Datensatz | 3, 4 |
+| Aufbewahrung (Rz. 113–144) | Empfangsformat, keine Konvertierung, E-Rechnungen vollständig, Mindestfrist je Datensatz, keine Löschung | 3, 4 |
 | Datenzugriff (Rz. 158–178) | Z1 am Bildschirm, Z3-Export als CSV mit index.xml | 4 |

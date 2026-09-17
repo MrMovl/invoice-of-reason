@@ -80,9 +80,9 @@ Reachable at `invoices.example.com` behind a login.
   create, fsynced, and made read-only (0444). The DB row and file are committed together.
 - Nothing is ever regenerated. Changing `sender.toml` only affects future invoices.
 - Every detail page and every backup re-verifies the SHA-256 of the stored PDFs.
-- `retain_until` = 31.12. of (issue year + `INVOICES_RETENTION_YEARS`, default 10).
-  Note: since 2025 the statutory period for Buchungsbelege such as outgoing invoices is 8 years
-  (BEG IV); 10 years is the safer default you asked for. Nothing is deleted automatically.
+- `retain_until` = 31.12. of (issue year + `INVOICES_RETENTION_YEARS`, default 10). It is a
+  minimum, not an end date, and nothing is ever deleted. Since 2025 Buchungsbelege such as invoices
+  need 8 years (BEG IV); 10 is a deliberate conservative default, see [GOBD.md](GOBD.md#retention).
 - Cancelled invoices stay in the archive with status "Storniert" and a reason.
 - Invoice numbers follow `YYYY-NNN` without gaps. The archive page lists gaps, numbers outside the
   scheme and numbers whose year differs from the issue date (`archive.number_gaps`). Creating an
