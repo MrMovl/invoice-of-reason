@@ -16,3 +16,6 @@ __pycache__/
 .pytest_cache/
 build/
 dist/
+
+# Private notes for the tax advisor (German), kept up to date locally
+STEUERBERATER.md
