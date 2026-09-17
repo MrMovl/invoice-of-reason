@@ -155,7 +155,8 @@ def connect(db_path: Path) -> sqlite3.Connection:
 
 
 # Schema changes after the initial schema. Each entry runs once, in order, inside one
-# transaction, and is recorded in system_events (GoBD Rz. 142: migrations are documented).
+# transaction with foreign keys off (checked before commit), and is recorded in system_events
+# (GoBD Rz. 142: migrations are documented).
 # PRAGMA user_version holds the number of applied migrations. Never edit an applied entry.
 MIGRATIONS: list[tuple[str, str | Callable[[sqlite3.Connection], None]]] = [
     (
@@ -187,6 +188,60 @@ MIGRATIONS: list[tuple[str, str | Callable[[sqlite3.Connection], None]]] = [
         """,
     ),
     ("hash chain over all logs", lambda conn: _introduce_hash_chain(conn)),
+    (
+        "expenses: allow XML e-invoices (doc_type 'xml')",
+        # SQLite cannot alter a CHECK constraint: rebuild the table (sqlite.org/lang_altertable.html,
+        # "other kinds of table schema changes"). DROP TABLE fires no DELETE trigger; the
+        # triggers go with the old table and are recreated unchanged. migrate() switches foreign
+        # keys off around the rebuild and runs foreign_key_check before committing.
+        """
+        CREATE TABLE expenses_new (
+            id                INTEGER PRIMARY KEY,
+            vendor            TEXT NOT NULL DEFAULT '',
+            invoice_number    TEXT NOT NULL DEFAULT '',
+            expense_date      TEXT,
+            amount_cents      INTEGER CHECK (amount_cents IS NULL OR amount_cents > 0),
+            category          TEXT NOT NULL DEFAULT '',
+            status            TEXT NOT NULL DEFAULT 'paid'
+                              CHECK (status IN ('paid', 'open', 'void')),
+            paid_date         TEXT,
+            notes             TEXT NOT NULL DEFAULT '',
+            reviewed          INTEGER NOT NULL DEFAULT 0 CHECK (reviewed IN (0, 1)),
+            doc_path          TEXT NOT NULL UNIQUE,
+            doc_sha256        TEXT NOT NULL UNIQUE,
+            doc_size          INTEGER NOT NULL,
+            doc_type          TEXT NOT NULL CHECK (doc_type IN ('pdf', 'jpg', 'png', 'xml')),
+            original_filename TEXT NOT NULL DEFAULT '',
+            doc_text          TEXT NOT NULL DEFAULT '',  -- PDF text layer or e-invoice rendering
+            suggestion_json   TEXT NOT NULL,
+            retain_until      TEXT NOT NULL,
+            created_at        TEXT NOT NULL,
+            updated_at        TEXT NOT NULL
+        );
+        INSERT INTO expenses_new (id, vendor, invoice_number, expense_date, amount_cents, category,
+            status, paid_date, notes, reviewed, doc_path, doc_sha256, doc_size, doc_type,
+            original_filename, doc_text, suggestion_json, retain_until, created_at, updated_at)
+        SELECT id, vendor, invoice_number, expense_date, amount_cents, category,
+            status, paid_date, notes, reviewed, doc_path, doc_sha256, doc_size, doc_type,
+            original_filename, doc_text, suggestion_json, retain_until, created_at, updated_at
+        FROM expenses;
+        DROP TABLE expenses;
+        ALTER TABLE expenses_new RENAME TO expenses;
+        CREATE INDEX idx_expenses_expense_date ON expenses(expense_date);
+        CREATE TRIGGER expenses_no_delete
+        BEFORE DELETE ON expenses
+        BEGIN
+            SELECT RAISE(ABORT, 'archived expenses cannot be deleted');
+        END;
+        CREATE TRIGGER expenses_immutable
+        BEFORE UPDATE OF doc_path, doc_sha256, doc_size, doc_type, original_filename, doc_text,
+            suggestion_json, retain_until, created_at
+        ON expenses
+        BEGIN
+            SELECT RAISE(ABORT, 'archived expense documents are immutable');
+        END;
+        """,
+    ),
     (
         "payment_method on invoices and expenses",
         # GoBD Rz. 79 (Zahlungsart). '' = unknown, for rows recorded before this migration.
@@ -222,6 +277,10 @@ def migrate(conn: sqlite3.Connection) -> None:
         # Re-read inside the loop: another process may have migrated concurrently.
         if schema_version(conn) >= number:
             continue
+        # Table rebuilds drop a table other tables reference. Foreign keys must be off for that,
+        # and the pragma is a no-op inside a transaction, so switch it around the transaction.
+        foreign_keys = conn.execute("PRAGMA foreign_keys").fetchone()[0]
+        conn.execute("PRAGMA foreign_keys = OFF")
         conn.execute("BEGIN IMMEDIATE")
         try:
             if schema_version(conn) >= number:
@@ -232,12 +291,17 @@ def migrate(conn: sqlite3.Connection) -> None:
             else:
                 for statement in _statements(sql):
                     conn.execute(statement)
+            broken = conn.execute("PRAGMA foreign_key_check").fetchall()
+            if broken:
+                raise sqlite3.IntegrityError(f"migration {number} breaks foreign keys: {broken[:3]}")
             conn.execute(f"PRAGMA user_version = {number}")
             add_system_event(conn, "schema_migration", f"{number}: {description}")
             conn.commit()
         except BaseException:
             conn.rollback()
             raise
+        finally:
+            conn.execute(f"PRAGMA foreign_keys = {int(foreign_keys)}")
 
 
 def _statements(sql: str) -> list[str]:

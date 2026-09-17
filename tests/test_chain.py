@@ -145,3 +145,24 @@ def test_backup_records_chain_heads_and_restore_test_detects_truncation(store):
     with pytest.raises(backup.BackupError, match="weicht vom Stand im Backup ab"):
         backup.restore_test(s, path)
     assert head["id"] > 0
+
+
+def test_production_database_migrates_cleanly_through_all_migrations(env, monkeypatch):
+    """The deployed database has no migrations yet. All of them, including the expenses table
+    rebuild after the hash chain was introduced, must leave a verifiable archive."""
+    s = load_settings()
+    conn = db.connect(s.db_path)
+    monkeypatch.setattr(db, "MIGRATIONS", [])
+    db.init_db(conn)
+    inv_id = issue(s, conn)
+    archive.set_notes(conn, inv_id, "vor der Migration")
+    expenses.store_upload(conn, s.expenses_dir, PNG, "a.png", s.retention_years)
+    monkeypatch.undo()
+
+    db.init_db(conn)
+    assert db.schema_version(conn) == len(db.MIGRATIONS)
+    assert chain.verify_chains(conn) == []
+    assert cli.main(["verify"]) == 0
+    archive.set_status(conn, inv_id, "paid", date(2026, 9, 20), payment_method="bank")
+    assert chain.verify_chains(conn) == []
+    conn.close()

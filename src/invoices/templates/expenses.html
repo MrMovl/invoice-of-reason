@@ -25,11 +25,11 @@
 
 <form method="post" action="{{ url_for('web.expense_upload') }}" enctype="multipart/form-data" class="card upload">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <label>Belege hochladen <small>(PDF, JPEG oder PNG, mehrere möglich)</small>
-    <input name="files" type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" multiple required>
+  <label>Belege hochladen <small>(PDF, JPEG, PNG oder E-Rechnung als XML, mehrere möglich)</small>
+    <input name="files" type="file" accept="application/pdf,image/jpeg,image/png,application/xml,text/xml,.pdf,.jpg,.jpeg,.png,.xml" multiple required>
   </label>
   <button class="btn btn-primary" type="submit">Hochladen</button>
-  <p class="hint">Betrag, Datum, Rechnungsnummer und Lieferant werden aus PDFs mit Text automatisch gelesen. Fotos und Scans bitte von Hand ergänzen. Belege werden unveränderbar archiviert.</p>
+  <p class="hint">Betrag, Datum, Rechnungsnummer und Lieferant werden aus E-Rechnungen (XRechnung, ZUGFeRD/Factur-X) und PDFs mit Text automatisch gelesen. Fotos und Scans bitte von Hand ergänzen. Belege werden unveränderbar archiviert.</p>
 </form>
 
 <dl class="stats">

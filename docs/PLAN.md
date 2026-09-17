@@ -48,13 +48,24 @@ Reachable at `invoices.example.com` behind a login.
 
 ## Expenses
 
-- Upload one or many PDF/JPEG/PNG files (max. 20 MB each). Identical files are rejected by hash.
+- Upload one or many PDF/JPEG/PNG files or XML e-invoices (max. 20 MB each). Identical files are
+  rejected by hash. The type is detected from the content, not the file name.
 - Documents go to `data/expenses/<upload year>/<YYYYMMDD>_<original name>_<sha8>.<ext>`, same
   write-once rules as invoice PDFs.
 - PDFs with a text layer are read with `pdftotext -layout` (first 5 pages). `extract.py` suggests
   vendor (legal form like GmbH, else first line), invoice number, invoice date and the gross total
   (labelled totals like "Gesamtbetrag"/"Zahlbetrag" win, net/VAT lines are skipped, else the largest
   amount with a currency). Scans and photos get no suggestion. No OCR, nothing leaves the server.
+- E-invoices (`einvoice.py`): XRechnung/EN 16931 XML in UBL 2.1 (Invoice, CreditNote) or CII is
+  archived byte for byte (`doc_type = 'xml'`); anything else that looks like XML is rejected, as is
+  XML with DOCTYPE/ENTITY declarations. Seller, number, date and payable amount become the
+  suggestion (other currencies are not prefilled; credit notes are flagged, amount stays positive).
+  The detail page renders the invoice (parties, dates, lines, totals) from the archived XML; "XML
+  ansehen" serves the raw file as `text/plain`, never as renderable XML. `doc_text` holds a plain
+  text rendering for search.
+- ZUGFeRD/Factur-X PDFs: `pdfdetach` looks for an attached `factur-x.xml`, `zugferd-invoice.xml` or
+  `xrechnung.xml`; its values win over the text-layer heuristics. The PDF stays the archived
+  document. `suggestion_json.source` records `xml`, `zugferd`, `text` or `none`.
 - Every upload stays "zu prüfen" until saved once; "Speichern und nächster" walks the review queue.
   Uploads unreviewed for more than 10 days are marked "über 10 Tage ungeprüft" (GoBD Rz. 47).
 - Saving requires a category, and for paid expenses a payment method (bank/card, cash, paid
@@ -108,13 +119,13 @@ Done in v0.1:
 - Invoices only enter the archive through the create form. The first invoice 2026-001, made
   before the tool existed, was archived once from its original PDF (source "imported").
 - Backups: automatic daily, manual button, download, rotation, verify, restore CLI.
-- Expenses: upload, text-layer suggestions, review queue, categories, search in document text,
+- Expenses: upload, text-layer and e-invoice (XRechnung, ZUGFeRD) suggestions, review queue, categories, search in document text,
   income/expense summary. Included in verify and backups.
 
 Later (not built):
 - Off-site backup target (decide: see BACKUP.md options).
 - Multiple line items, VAT (Regelbesteuerung) once no longer Kleinunternehmer.
-- E-invoice formats (ZUGFeRD/XRechnung). B2B e-invoicing obligations apply to
-  Kleinunternehmer for receiving only; issuing stays optional for them.
+- Issuing e-invoices (ZUGFeRD/XRechnung). B2B e-invoicing obligations apply to
+  Kleinunternehmer for receiving only (done); issuing stays optional for them.
 - Sending invoices by email.
 - OCR for scanned expense receipts (tesseract), expense export for the EÜR (Anlage EÜR lines).

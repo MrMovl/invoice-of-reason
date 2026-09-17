@@ -185,6 +185,15 @@ td.num { font-family: var(--mono); font-size: 14px; }
 .upload label { flex: 1 1 300px; }
 .upload .hint { flex-basis: 100%; }
 .kv + [data-dialog-open] { margin-top: 18px; }
+/* Readable view of an XML e-invoice */
+.einvoice { margin-bottom: 1.5rem; }
+.einvoice-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 1rem; }
+.einvoice-head strong { font: 350 22px/1.2 var(--serif); color: var(--deep); margin-right: 4px; }
+.einvoice-lines { width: 100%; margin: 1rem 0; font-size: 14px; }
+.einvoice-lines th, .einvoice-lines td { padding: 8px 6px; }
+.einvoice-lines td { overflow-wrap: anywhere; }
+.einvoice-totals dd { text-align: right; font-variant-numeric: tabular-nums; }
+.einvoice-totals dd strong { font-size: 20px; }
 .doc-preview { display: block; max-width: 100%; max-height: 440px; border: 1px solid var(--rule); border-radius: var(--radius); margin-bottom: .75rem; }
 /* Full-screen dialog for the PDF text: keeps the layout columns, scrolls in both directions. */
 .text-dialog { width: 100vw; height: 100vh; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
