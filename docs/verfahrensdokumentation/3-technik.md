@@ -32,15 +32,17 @@ Alle Zeitstempel (`created_at`, `updated_at`, `at`) sind UTC im Format ISO 8601
 | Feld | Bedeutung | änderbar |
 |---|---|---|
 | `id` | interne laufende Nummer | nein |
+| `kind` | leer = Ausgangsrechnung, `cancellation` = Stornorechnung (2.3) | nein |
+| `cancels_invoice_id` | bei einer Stornorechnung die `id` der stornierten Rechnung, sonst leer; genau eine Stornorechnung je Rechnung (eindeutiger Index) | nein |
 | `number` | Rechnungsnummer, eindeutig, Schema `JJJJ-NNN` | nein |
 | `issue_date` | Rechnungsdatum | nein |
 | `service_date` | Leistungsdatum/-zeitraum wie gedruckt (`16.09.2026` oder `01.09.2026 bis 15.09.2026`) | nein |
 | `due_date` | Fälligkeit | nein |
 | `customer_name`, `customer_street`, `customer_city` | Kunde wie auf der Rechnung | nein |
 | `title`, `description` | Leistung | nein |
-| `amount_cents` | Rechnungsbetrag in Cent | nein |
-| `status` | `open` offen, `paid` bezahlt, `cancelled` storniert | ja, protokolliert |
-| `paid_date` | Zahlungseingang | ja, protokolliert |
+| `amount_cents` | Rechnungsbetrag in Cent; bei einer Stornorechnung negativ (Betrag der stornierten Rechnung) | nein |
+| `status` | Ausgangsrechnung: `open` offen, `paid` bezahlt, `cancelled` storniert. Stornorechnung: Stand der Erstattung, `cancelled` = keine Erstattung (Rechnung war unbezahlt), `open` = Erstattung offen, `paid` = erstattet | ja, protokolliert |
+| `paid_date` | Zahlungseingang; bei einer Stornorechnung der Tag der Erstattung. Eine durch Stornorechnung stornierte Rechnung behält ihren Zahlungseingang | ja, protokolliert |
 | `payment_method` | `bank` Überweisung/Karte, `cash` bar, leer = nicht erfasst (vor Einführung des Feldes) | ja, protokolliert |
 | `notes` | interne Notiz | ja, protokolliert |
 | `source` | `generated` im Programm erstellt, `imported` vor Einführung des Programms erstellt, Original-PDF unverändert übernommen (Teil 2.9) | nein |
@@ -89,9 +91,11 @@ Alle Zeitstempel (`created_at`, `updated_at`, `at`) sind UTC im Format ISO 8601
 | `state_hash` | Hash des Datensatzes nach dieser Änderung (3.4) |
 
 Aktionen `events`: `created` erstellt (Detail: `sha256=<PDF-Prüfsumme>`, ggf. Grund für abweichende
-Nummer), `imported` übernommen (Detail: Prüfsumme, Grund, Originaldatei, ggf. Abweichung vom
+Nummer; bei einer Stornorechnung Verweis auf die stornierte Rechnung und Grund), `imported` übernommen (Detail: Prüfsumme, Grund, Originaldatei, ggf. Abweichung vom
 Nummernkreis und bestätigte Hinweise), `status:open`, `status:paid`, `status:cancelled` Statusänderung,
-`notes` Notiz geändert, `sealed` Zustand beim Einführen der Hash-Kette festgehalten.
+`notes` Notiz geändert, `sealed` Zustand beim Einführen der Hash-Kette festgehalten. Beim Storno
+mit Dokument nennt der Eintrag `status:cancelled` der Rechnung die Nummer der Stornorechnung; auf
+der Stornorechnung heißt der Statuswechsel „Erstattung: … → …“.
 
 Aktionen `expense_events`: `uploaded` hochgeladen (`sha256=…`), `reviewed` erstmals geprüft und
 gespeichert, `updated` später geändert, `sealed` wie oben.
@@ -122,10 +126,17 @@ Fehler), `app_version`, `hash`. Siehe Teil 5.
 4. **Änderungsprotokoll:** Jede Änderung eines änderbaren Feldes erzeugt im selben
    Datenbankvorgang einen Verlaufseintrag mit altem und neuem Wert. Texte werden vollständig
    protokolliert.
-5. **Keine Neuerzeugung:** Rechnungs-PDFs werden nie neu erzeugt. Änderungen der Absenderdaten
+5. **Stornorechnungen** sind eigene, unveränderbare Dokumente; sie ersetzen keine Rechnung,
+   sondern verweisen auf sie. Rechnung und Stornorechnung werden in einem Datenbankvorgang
+   gespeichert (beide Verlaufseinträge inbegriffen) oder gar nicht. Ein Trigger stellt sicher, dass
+   eine Stornorechnung genau auf eine Ausgangsrechnung verweist und keine Stornorechnung storniert
+   wird; ein eindeutiger Index lässt nur eine Stornorechnung je Rechnung zu. Fehlt beim Start ein
+   Schutz-Trigger, wird er in seiner aktuellen Fassung wiederhergestellt und der Vorfall
+   protokolliert.
+6. **Keine Neuerzeugung:** Rechnungs-PDFs werden nie neu erzeugt. Änderungen der Absenderdaten
    wirken nur auf künftige Rechnungen; die Daten zum Erstellungszeitpunkt stehen in `payload_json`
    (Stammdatenhistorie, Rz. 59 Beispiel 4).
-6. **Hash-Kette und Trigger-Prüfung** (3.4) erkennen Eingriffe unter Umgehung der Trigger.
+7. **Hash-Kette und Trigger-Prüfung** (3.4) erkennen Eingriffe unter Umgehung der Trigger.
 
 ## 3.4 Hash-Kette (Rz. 110)
 
@@ -207,3 +218,4 @@ ausgeführter Migrationen. Migrationen ändern nur Struktur oder Format, nie Inh
 | 4 | Spalte `payment_method` in `invoices` und `expenses` |
 | 5 | Spalte `reverse_charge` in `expenses` (Vorgabe leer, Hashes bleiben gültig) |
 | 6 | Spalte `treatment` in `expenses` (Vorgabe leer, Hashes bleiben gültig) |
+| 7 | Spalten `kind` und `cancels_invoice_id` in `invoices`, eindeutiger Index auf `cancels_invoice_id`, Trigger `invoices_cancellation_reference`; `invoices_immutable` mit beiden Spalten neu erstellt (Vorgaben leer bzw. NULL, Hashes bleiben gültig) |

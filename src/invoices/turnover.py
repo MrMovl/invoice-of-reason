@@ -67,10 +67,15 @@ class Status:
         return self.lost_by_previous_year or self.received > self.limit
 
 
+# Receipts: invoices (kind '') with a payment date, paid or cancelled later by a cancellation
+# document (which keeps the payment). Cancellation documents and their refunds are not subtracted
+# until the Steuerberater question on refunds is answered (docs/GOBD.md); that errs on the safe side.
+RECEIPTS_SQL = ("FROM invoices WHERE kind = '' AND paid_date IS NOT NULL AND status IN ('paid', 'cancelled') "
+                "AND substr(paid_date, 1, 4) = ?")
+
+
 def _received(conn: sqlite3.Connection, year: int) -> int:
-    return conn.execute(
-        "SELECT COALESCE(SUM(amount_cents), 0) FROM invoices WHERE status = 'paid' AND substr(paid_date, 1, 4) = ?",
-        (f"{year:04d}",)).fetchone()[0]
+    return conn.execute(f"SELECT COALESCE(SUM(amount_cents), 0) {RECEIPTS_SQL}", (f"{year:04d}",)).fetchone()[0]
 
 
 def status(conn: sqlite3.Connection, founding_year: int | None, year: int | None = None) -> Status:
@@ -80,15 +85,15 @@ def status(conn: sqlite3.Connection, founding_year: int | None, year: int | None
         year=year,
         founding_year=founding_year,
         received=_received(conn, year),
-        open=conn.execute("SELECT COALESCE(SUM(amount_cents), 0) FROM invoices WHERE status = 'open'").fetchone()[0],
+        open=conn.execute(
+            "SELECT COALESCE(SUM(amount_cents), 0) FROM invoices WHERE kind = '' AND status = 'open'").fetchone()[0],
         previous_year=0 if is_founding else _received(conn, year - 1),
         limit=FOUNDING_YEAR_LIMIT_CENTS if is_founding else CURRENT_YEAR_LIMIT_CENTS,
         is_founding_year=is_founding,
     )
     running = 0
     for number, paid, cents in conn.execute(
-        "SELECT number, paid_date, amount_cents FROM invoices WHERE status = 'paid' AND substr(paid_date, 1, 4) = ? "
-        "ORDER BY paid_date, id", (f"{year:04d}",)):
+        f"SELECT number, paid_date, amount_cents {RECEIPTS_SQL} ORDER BY paid_date, id", (f"{year:04d}",)):
         running += cents
         if running > st.limit:
             st.crossing = (number, paid)

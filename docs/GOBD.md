@@ -147,7 +147,7 @@ Programmidentität. Rules that follow:
 | 19 | Capital assets excluded from the expense total | done (`gobd/capital-assets`); register and AfA stay outside |
 | 20 | Turnover limit monitor (§ 19 UStG since 2025) | done (`gobd/turnover-limit`) |
 | 21 | Hotfix: cancelling a paid invoice erased the receipt | done (`fix/paid-cancellation`); paid → cancelled refused, lost receipts reported |
-| 9 | Cancellation document | design proposal pending |
+| 9 | Cancellation document | done (`gobd/cancellation`), see [CANCELLATION.md](CANCELLATION.md) |
 
 ## Questions for the Steuerberater
 
@@ -172,6 +172,14 @@ kept privately outside this repository.
 6. **Receipts vs. open invoices in the projection.** The monitor projects all open invoices into
    the current year and blocks when the projection exceeds the limit. Is blocking on projected
    (not yet received) amounts the right safety margin, or should only receipts block? (#20)
+7. **Cancellation document needed?** For an invoice the customer already received, is a separate
+   cancellation document required for a Kleinunternehmer, or does the status plus reason suffice?
+   Decided in the tool: it offers one, titled "Stornorechnung", numbered in the same sequence
+   (#9, CANCELLATION.md). Open: whether it is required, and whether the customer's bookkeeping
+   prefers "Rechnungskorrektur".
+8. **Refunds and the Gesamtumsatz.** If a paid invoice is cancelled and the money refunded, does the
+   refund reduce the § 19 turnover of the refund year, of the receipt year, or not at all? The tool
+   subtracts nothing and shows the refund separately in the cash overview. (#9, #20)
 
 ## Order
 

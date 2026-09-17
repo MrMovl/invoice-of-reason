@@ -96,7 +96,7 @@ def test_cash_summary_by_payment_date(store):
 
     summary = expenses.cash_summary(conn, "2026")
     summary.pop("reverse_charge")
-    assert summary == {"year": "2026", "income": 0, "expenses": 10000, "assets": 0,
+    assert summary == {"year": "2026", "income": 0, "refunds": 0, "expenses": 10000, "assets": 0,
                        "surplus_before_afa": -10000, "to_review": 0}
     assert expenses.cash_summary(conn, "2027")["surplus_before_afa"] == 70000 - 3000
     assert expenses.cash_summary(conn, "x' OR 1=1")["year"] == ""

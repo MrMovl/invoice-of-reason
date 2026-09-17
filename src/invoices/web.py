@@ -124,6 +124,7 @@ def inject_globals():
     return {
         "csrf_token": auth.csrf_token,
         "status_labels": STATUS_LABELS,
+        "status_label": archive.status_label,
         "expense_status_labels": EXPENSE_STATUS_LABELS,
         "payment_labels": archive.PAYMENT_METHODS,
         "current_user": session.get("user"),
@@ -219,8 +220,11 @@ def invoice_list():
     if year:
         where.append("substr(issue_date, 1, 4) = ?")
         params.append(year)
-    if status in STATUS_LABELS:
-        where.append("status = ?")
+    if status == "storno":
+        where.append("kind = ?")
+        params.append(archive.CANCELLATION)
+    elif status in STATUS_LABELS:
+        where.append("kind = '' AND status = ?")
         params.append(status)
     if q:
         where.append("(number LIKE ? OR customer_name LIKE ? OR title LIKE ?)")
@@ -231,12 +235,16 @@ def invoice_list():
     rows = conn.execute(sql + " ORDER BY issue_date DESC, number DESC", params).fetchall()
 
     today = date.today().isoformat()
+    invoices = [r for r in rows if r["kind"] == ""]
+    cancellations = [r for r in rows if r["kind"] == archive.CANCELLATION]
     totals = {
-        "count": len(rows),
-        "billed": sum(r["amount_cents"] for r in rows if r["status"] != "cancelled"),
-        "paid": sum(r["amount_cents"] for r in rows if r["status"] == "paid"),
-        "open": sum(r["amount_cents"] for r in rows if r["status"] == "open"),
-        "overdue": sum(1 for r in rows if r["status"] == "open" and r["due_date"] and r["due_date"] < today),
+        "count": len(invoices),
+        "billed": sum(r["amount_cents"] for r in invoices if r["status"] != "cancelled"),
+        "paid": sum(r["amount_cents"] for r in invoices if r["status"] == "paid"),
+        "open": sum(r["amount_cents"] for r in invoices if r["status"] == "open"),
+        "overdue": sum(1 for r in invoices if r["status"] == "open" and r["due_date"] and r["due_date"] < today),
+        "cancellations": len(cancellations),
+        "refunds_open": -sum(r["amount_cents"] for r in cancellations if r["status"] == "open"),
     }
     return render_template("list.html", turnover=_turnover(conn), rows=rows, years=years, year=year, status=status,
                            q=q, totals=totals, today=today,
@@ -253,7 +261,7 @@ def _customers(conn):
     """Most recent address per customer, for autofill."""
     return conn.execute(
         """SELECT customer_name, customer_street, customer_city FROM invoices
-           WHERE id IN (SELECT MAX(id) FROM invoices GROUP BY customer_name)
+           WHERE id IN (SELECT MAX(id) FROM invoices WHERE kind = '' GROUP BY customer_name)
            ORDER BY customer_name"""
     ).fetchall()
 
@@ -269,7 +277,7 @@ def _new_form_defaults(conn) -> dict:
     }
     copy_id = request.args.get("from", type=int)
     if copy_id:
-        src = conn.execute("SELECT * FROM invoices WHERE id = ?", (copy_id,)).fetchone()
+        src = conn.execute("SELECT * FROM invoices WHERE id = ? AND kind = ''", (copy_id,)).fetchone()
         if src:
             for key in ("customer_name", "customer_street", "customer_city", "title", "description"):
                 form[key] = src[key]
@@ -338,7 +346,28 @@ def invoice_detail(invoice_id: int):
         "SELECT * FROM events WHERE invoice_id = ? ORDER BY id DESC", (invoice_id,)).fetchall()
     problem = archive.verify_invoice(settings().archive_dir, row)
     return render_template("detail.html", inv=row, events=events, problem=problem,
+                           links=archive.cancellation_links(get_db(), invoice_id),
                            today=date.today().isoformat())
+
+
+@bp.post("/invoices/<int:invoice_id>/cancel")
+@auth.login_required
+def invoice_cancel(invoice_id: int):
+    _get_invoice(invoice_id)
+    conn = get_db()
+    s = settings()
+    reason = request.form.get("reason", "")
+    try:
+        if request.form.get("mode") == "unsent":
+            archive.cancel_unsent(conn, invoice_id, reason)
+            flash("Rechnung storniert (nicht versandt).", "ok")
+            return redirect(url_for("web.invoice_detail", invoice_id=invoice_id))
+        doc_id = archive.cancel_invoice(conn, s.archive_dir, invoice_id, reason, _load_sender(), s.retention_years)
+    except (archive.ArchiveError, LayoutOverflowError) as e:
+        flash(str(e), "error")
+        return redirect(url_for("web.invoice_detail", invoice_id=invoice_id))
+    flash("Stornorechnung erstellt und archiviert.", "ok")
+    return redirect(url_for("web.invoice_detail", invoice_id=doc_id))
 
 
 @bp.get("/invoices/<int:invoice_id>/pdf")
@@ -363,7 +392,7 @@ def invoice_status(invoice_id: int):
             paid = archive.parse_date(request.form.get("paid_date"), "Zahlungsdatum")
         archive.set_status(get_db(), invoice_id, status, paid, request.form.get("note", ""),
                            request.form.get("payment_method", ""))
-        flash(f"Status: {STATUS_LABELS[status]}.", "ok")
+        flash(f"Status: {archive.status_label(_get_invoice(invoice_id)['kind'], status)}.", "ok")
     except archive.ArchiveError as e:
         flash(str(e), "error")
     return redirect(url_for("web.invoice_detail", invoice_id=invoice_id))

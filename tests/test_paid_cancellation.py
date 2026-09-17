@@ -28,7 +28,7 @@ def test_paid_invoice_cannot_be_cancelled_and_receipt_stays(store):
     s, conn = store
     inv = issue(s, conn)
     archive.set_status(conn, inv, "paid", date(2026, 9, 20), payment_method="bank")
-    with pytest.raises(archive.ArchiveError, match="Stornorechnung und die Erfassung der Erstattung"):
+    with pytest.raises(archive.ArchiveError, match="Stornorechnung erstellen und die Erstattung dort"):
         archive.set_status(conn, inv, "cancelled", note="Doppelt")
     row = conn.execute("SELECT status, paid_date, payment_method FROM invoices").fetchone()
     assert tuple(row) == ("paid", "2026-09-20", "bank")
@@ -71,7 +71,7 @@ def test_web_hides_cancel_form_for_paid_and_lists_findings(logged_in, csrf, app)
     logged_in.post(url + "/status", data={"status": "paid", "paid_date": "2026-09-20", "payment_method": "bank",
                                           "csrf_token": csrf_from(page)})
     page = logged_in.get(url).get_data(as_text=True)
-    assert 'value="cancelled"' not in page and "Diese Funktion folgt in Kürze" in page
+    assert 'value="unsent"' not in page and "Stornorechnung erstellen" in page
     refused = logged_in.post(url + "/status", data={"status": "cancelled", "note": "x", "csrf_token": csrf_from(page)},
                              follow_redirects=True).get_data(as_text=True)
     assert "Stornorechnung" in refused
