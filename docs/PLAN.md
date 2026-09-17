@@ -46,6 +46,20 @@ Reachable at `invoices.example.com` behind a login.
   that all protective triggers exist, so dropping a trigger and editing the file is detected.
   New columns must default to NULL or '' (omitted from hashes) or come with a re-seal migration.
 
+## Cancellation documents
+
+- Cancelling an invoice that was never sent (only while unpaid) stays a status change with a reason.
+- An invoice the customer received is cancelled with a Stornorechnung: `archive.cancel_invoice`
+  writes a row in `invoices` with `kind = 'cancellation'`, `cancels_invoice_id`, the next number of
+  the same sequence and a negative amount, renders the PDF through the invoice layout
+  (`pdf.Cancellation`) and archives it write-once. Original and document are committed together.
+- The original keeps `paid_date` and `payment_method`; its status becomes `cancelled` and can no
+  longer change. On the cancellation row the status is the refund: `cancelled` nothing to refund,
+  `open` refund due, `paid` refunded (`paid_date` = payout).
+- Every sum over `invoices` filters by `kind`: income counts receipts of invoices including later
+  cancelled ones, refunds are a separate line in the year of payout, the turnover monitor counts
+  receipts only and subtracts no refunds. See docs/CANCELLATION.md.
+
 ## Turnover limit monitor (§ 19 UStG)
 
 `turnover.py` counts paid invoices by `paid_date` year (receipts), projects open invoices, and

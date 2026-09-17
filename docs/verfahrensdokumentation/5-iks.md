@@ -10,6 +10,9 @@ entsprechend der Unternehmensgröße (Rz. 15).
 |---|---|---|---|
 | Zugangskontrolle | nur berechtigter Zugriff | jede Anfrage | Anmeldung erforderlich (Teil 4.2) |
 | Eingabeprüfung | plausible Daten | bei jeder Eingabe | Fehlermeldung; ungültige Daten werden nicht gespeichert (Beträge > 0, max. 2 Nachkommastellen, gültige Daten, Pflichtfelder, Leistungszeitraum) |
+| Storno mit Dokument | Der Kunde erhält ein Dokument, das eindeutig auf die Rechnung verweist (Rz. 64) | bei jedem Storno einer versandten Rechnung | Stornorechnung mit Nummer, Verweis und Grund; Verlaufseinträge in beiden Richtungen |
+| Eindeutigkeit des Stornos | Keine doppelte oder widersprüchliche Stornierung | bei jedem Storno | Eindeutiger Index und Trigger in der Datenbank; Statusänderungen an stornierten Rechnungen gesperrt |
+| Offene Erstattungen | Erstattungen werden ausgezahlt und erfasst | laufend in der Rechnungsliste | Summe „Erstattung offen“; Stand je Stornorechnung |
 | Storno bezahlter Rechnungen | Zahlungseingänge bleiben erhalten | bei jeder Statusänderung; laufend in der Rechnungsliste | Sperre „bezahlt → storniert“ mit Meldung; Hinweis auf stornierte Rechnungen, die direkt vor dem Storno bezahlt waren (nur Anzeige) |
 | Nummernkreis | Vollständigkeit, keine Doppelvergabe | beim Erstellen, laufend in der Rechnungsliste | Nummer eindeutig (Datenbank); abweichende Nummer nur mit Grund im Verlauf; Lückenanzeige |
 | Duplikaterkennung | keine Doppelerfassung von Belegen | beim Hochladen | identische Datei (SHA-256) wird abgelehnt |

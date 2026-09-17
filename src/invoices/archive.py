@@ -133,9 +133,8 @@ def number_gaps(conn: sqlite3.Connection) -> dict[str, dict]:
 
 PAID_CANCEL_MESSAGE = (
     "Eine bezahlte Rechnung kann nicht einfach storniert werden: Der Zahlungseingang bliebe sonst "
-    "nicht erhalten. Sie braucht eine Stornorechnung und die Erfassung der Erstattung. Diese Funktion "
-    "folgt in Kürze; bis dahin bleibt die Rechnung bezahlt. War die Zahlung irrtümlich erfasst, "
-    "„Wieder auf offen setzen“."
+    "nicht erhalten. Bitte unter „Stornieren“ eine Stornorechnung erstellen und die Erstattung dort "
+    "erfassen. War die Zahlung irrtümlich erfasst, zuerst „Wieder auf offen setzen“."
 )
 
 
@@ -145,7 +144,10 @@ def lost_receipt_findings(conn: sqlite3.Connection) -> list[str]:
     the turnover monitor. A payment that was first set back to open is a correction, not a finding.
     Report only; nothing is changed."""
     messages = []
-    for inv in conn.execute("SELECT id, number FROM invoices WHERE status = 'cancelled' ORDER BY number").fetchall():
+    # A cancellation document keeps the payment date of its original, so those are not affected.
+    for inv in conn.execute(
+            "SELECT id, number FROM invoices i WHERE kind = '' AND status = 'cancelled' AND paid_date IS NULL "
+            "AND NOT EXISTS (SELECT 1 FROM invoices c WHERE c.cancels_invoice_id = i.id) ORDER BY number").fetchall():
         statuses = conn.execute(
             "SELECT action, detail FROM events WHERE invoice_id = ? AND action LIKE 'status:%' ORDER BY id",
             (inv["id"],)).fetchall()
@@ -375,7 +377,9 @@ def issue_invoice(
 
 
 def _record(conn, archive_dir: Path, rel_path: str, pdf: bytes, source: str, row: dict,
-            detail: str = "") -> int:
+            detail: str = "", before_commit=None) -> int:
+    """Insert the row, log it, write the PDF once and commit, all or nothing. `before_commit(id)`
+    runs inside the same transaction (a cancellation updates its original there)."""
     now = db.now_iso()
     row = {
         **row,
@@ -394,6 +398,8 @@ def _record(conn, archive_dir: Path, rel_path: str, pdf: bytes, source: str, row
         invoice_id = cur.lastrowid
         db.add_event(conn, invoice_id, "created" if source == "generated" else "imported",
                      "; ".join(filter(None, [f"sha256={row['pdf_sha256']}", detail])))
+        if before_commit:
+            before_commit(invoice_id)
         _write_once(archive_dir, rel_path, pdf)
         written = True
         conn.commit()
@@ -408,6 +414,13 @@ def _record(conn, archive_dir: Path, rel_path: str, pdf: bytes, source: str, row
 
 
 STATUS_NAMES = {"open": "Offen", "paid": "Bezahlt", "cancelled": "Storniert"}
+CANCELLATION = "cancellation"
+# On a cancellation document the status describes the refund (docs/CANCELLATION.md).
+REFUND_STATUS_NAMES = {"cancelled": "Keine Erstattung", "open": "Erstattung offen", "paid": "Erstattet"}
+
+
+def status_label(kind: str, status: str) -> str:
+    return (REFUND_STATUS_NAMES if kind == CANCELLATION else STATUS_NAMES)[status]
 # GoBD Rz. 79. '' = unknown (recorded before the payment method existed).
 PAYMENT_METHODS = {"bank": "Überweisung/Karte", "cash": "Bar", "private": "Privat bezahlt (Einlage)"}
 
@@ -439,17 +452,28 @@ def set_status(conn: sqlite3.Connection, invoice_id: int, status: str,
     new_paid = paid_date.isoformat() if status == "paid" else None
     new_method = payment_method if status == "paid" else ""
     with conn:
-        row = conn.execute("SELECT status, paid_date, payment_method FROM invoices WHERE id = ?",
+        row = conn.execute("SELECT number, kind, status, paid_date, payment_method FROM invoices WHERE id = ?",
                            (invoice_id,)).fetchone()
         if row is None:
             raise ArchiveError("Rechnung nicht gefunden.")
-        if row["status"] == "paid" and status == "cancelled":
-            # Cancelling would clear paid_date and erase a real receipt from the cash overview and
-            # the § 19 turnover monitor, even for a past year. A receipt is undone by a refund.
-            raise ArchiveError(PAID_CANCEL_MESSAGE)
+        if row["kind"] == CANCELLATION:
+            # The status of a cancellation document is its refund: due -> refunded and back.
+            if row["status"] == "cancelled" or status == "cancelled":
+                raise ArchiveError("Bei dieser Stornorechnung gibt es keine Erstattung zu erfassen.")
+        else:
+            cancelled_by = conn.execute("SELECT number FROM invoices WHERE cancels_invoice_id = ?",
+                                        (invoice_id,)).fetchone()
+            if cancelled_by:
+                raise ArchiveError(f"Die Rechnung ist durch die Stornorechnung {cancelled_by['number']} storniert; "
+                                   "ihr Status kann nicht mehr geändert werden.")
+            if row["status"] == "paid" and status == "cancelled":
+                # Cancelling would clear paid_date and erase a real receipt from the cash overview and
+                # the § 19 turnover monitor, even for a past year. A receipt is undone by a refund.
+                raise ArchiveError(PAID_CANCEL_MESSAGE)
         conn.execute("UPDATE invoices SET status = ?, paid_date = ?, payment_method = ?, updated_at = ? "
                      "WHERE id = ?", (status, new_paid, new_method, db.now_iso(), invoice_id))
-        changes = [f"Status: {STATUS_NAMES[row['status']]} → {STATUS_NAMES[status]}"]
+        label = "Erstattung" if row["kind"] == CANCELLATION else "Status"
+        changes = [f"{label}: {status_label(row['kind'], row['status'])} → {status_label(row['kind'], status)}"]
         if row["paid_date"] != new_paid:
             changes.append(f"Bezahlt am: {_de(row['paid_date'])} → {_de(new_paid)}")
         if row["payment_method"] != new_method:
@@ -499,3 +523,128 @@ def verify_all(conn: sqlite3.Connection, archive_dir: Path) -> list[tuple[str, s
         if problem:
             problems.append((row["number"], problem))
     return problems
+
+
+def cancel_unsent(conn: sqlite3.Connection, invoice_id: int, reason: str) -> None:
+    """Cancel an invoice that never reached the customer: status and reason, no document. Only for
+    unpaid invoices; a paid invoice has reached the customer by definition."""
+    reason = reason.replace("\r\n", "\n").strip()
+    if not reason:
+        raise ArchiveError("Grund für die Stornierung fehlt.")
+    row = conn.execute("SELECT kind, status FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+    if row is None:
+        raise ArchiveError("Rechnung nicht gefunden.")
+    if row["kind"] == CANCELLATION or row["status"] != "open":
+        raise ArchiveError("Ohne Stornorechnung kann nur eine offene, nicht versandte Rechnung storniert werden.")
+    set_status(conn, invoice_id, "cancelled", note=f"Nicht versandt. {reason}"[:500])
+
+
+def cancel_invoice(
+    conn: sqlite3.Connection,
+    archive_dir: Path,
+    invoice_id: int,
+    reason: str,
+    sender: Sender,
+    retention_years: int,
+    issue_date: date | None = None,
+) -> int:
+    """Create the Stornorechnung for an invoice the customer received (docs/CANCELLATION.md).
+    Next number of the same sequence, negative amount, archived like an invoice. The original
+    becomes cancelled but keeps its payment; a paid original leaves a refund due on the new row.
+    Both rows and both events are committed together. Returns the id of the cancellation."""
+    from .pdf import Cancellation
+
+    issue_date = issue_date or date.today()
+    reason = reason.replace("\r\n", "\n").strip()
+    if not reason:
+        raise ArchiveError("Grund für die Stornierung fehlt.")
+    if len(reason) > 500:
+        raise ArchiveError("Grund ist zu lang (max. 500 Zeichen).")
+    orig = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+    if orig is None:
+        raise ArchiveError("Rechnung nicht gefunden.")
+    if orig["kind"] == CANCELLATION:
+        raise ArchiveError("Eine Stornorechnung kann nicht storniert werden.")
+    existing = conn.execute("SELECT number FROM invoices WHERE cancels_invoice_id = ?", (invoice_id,)).fetchone()
+    if existing:
+        raise ArchiveError(f"Die Rechnung ist bereits durch die Stornorechnung {existing['number']} storniert.")
+    original_date = date.fromisoformat(orig["issue_date"])
+    if issue_date < original_date:
+        raise ArchiveError("Die Stornorechnung kann nicht vor der Rechnung datiert sein.")
+
+    refund = orig["status"] == "paid"
+    number = next_number(conn, issue_date.year)
+    note = _printed_note(orig)
+    data = InvoiceData(
+        number=number, issue_date=issue_date, service_date=orig["service_date"], due_date=issue_date,
+        payment_days=0, customer_name=orig["customer_name"], customer_street=orig["customer_street"],
+        customer_city=orig["customer_city"], title=f"Storno: {orig['title']}", description="",
+        amount=-Decimal(orig["amount_cents"]) / 100,
+    )
+    info = Cancellation(original_number=orig["number"], original_date=original_date, refund=refund,
+                        small_business_note=note)
+    pdf = render_invoice(data, sender, cancellation=info)
+    rel_path = f"{issue_date.year}/Stornorechnung_{number}_{slugify(orig['customer_name'])}.pdf"
+    payload = {
+        "invoice": {k: str(v) for k, v in asdict(data).items()},
+        "sender": asdict(sender),
+        "texts": {"small_business_note": note, "reference": info.reference},
+        "cancels": {"id": orig["id"], "number": orig["number"], "issue_date": orig["issue_date"],
+                    "amount_cents": orig["amount_cents"]},
+        "reason": reason,
+    }
+
+    def update_original(cancellation_id: int) -> None:
+        conn.execute("UPDATE invoices SET status = 'cancelled', updated_at = ? WHERE id = ?",
+                     (db.now_iso(), orig["id"]))
+        db.add_event(conn, orig["id"], "status:cancelled",
+                     f"Status: {STATUS_NAMES[orig['status']]} → Storniert; Stornorechnung {number}; "
+                     f"Grund: {quote(reason)}")
+
+    return _record(
+        conn, archive_dir, rel_path, pdf, source="generated",
+        row={
+            "number": number,
+            "issue_date": issue_date.isoformat(),
+            "service_date": orig["service_date"],
+            "due_date": None,
+            "customer_name": orig["customer_name"],
+            "customer_street": orig["customer_street"],
+            "customer_city": orig["customer_city"],
+            "title": data.title,
+            "description": info.reference,
+            "amount_cents": -orig["amount_cents"],
+            "status": "open" if refund else "cancelled",
+            "payload_json": json.dumps(payload, ensure_ascii=False, sort_keys=True),
+            "retain_until": retain_until(issue_date, retention_years).isoformat(),
+            "kind": CANCELLATION,
+            "cancels_invoice_id": orig["id"],
+        },
+        detail=f"{info.reference}; Grund: {quote(reason)}",
+        before_commit=update_original,
+    )
+
+
+def _printed_note(orig) -> str:
+    """The § 19 note as printed on the original, so both documents agree."""
+    from .pdf import OLD_SMALL_BUSINESS_NOTE
+
+    texts = json.loads(orig["payload_json"] or "{}").get("texts") or {}
+    if texts.get("small_business_note"):
+        return texts["small_business_note"]
+    # Created before the note was recorded: generated invoices carried the old sentence. For
+    # imported invoices the original PDF is unknown here, so the current wording is used.
+    return OLD_SMALL_BUSINESS_NOTE if orig["source"] == "generated" else SMALL_BUSINESS_NOTE
+
+
+def cancellation_links(conn: sqlite3.Connection, invoice_id: int) -> dict:
+    """Both directions: the document cancelling this invoice, or the invoice this one cancels."""
+    row = conn.execute("SELECT kind, cancels_invoice_id FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+    if row is None:
+        return {}
+    if row["kind"] == CANCELLATION:
+        orig = conn.execute("SELECT id, number, issue_date FROM invoices WHERE id = ?",
+                            (row["cancels_invoice_id"],)).fetchone()
+        return {"cancels": orig}
+    doc = conn.execute("SELECT id, number, status FROM invoices WHERE cancels_invoice_id = ?", (invoice_id,)).fetchone()
+    return {"cancelled_by": doc}

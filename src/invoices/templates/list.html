@@ -11,6 +11,7 @@
     <select name="status" aria-label="Status">
       <option value="">Alle Status</option>
       {% for key, label in status_labels.items() %}<option value="{{ key }}" {{ 'selected' if key == status }}>{{ label }}</option>{% endfor %}
+      <option value="storno" {{ 'selected' if status == 'storno' }}>Stornorechnungen</option>
     </select>
     <input type="search" name="q" value="{{ q }}" placeholder="Nummer, Kunde, Titel" aria-label="Suche">
     <button class="btn" type="submit">Filtern</button>
@@ -36,6 +37,8 @@
   <div><dt>Umsatz</dt><dd>{{ totals.billed|eur }}</dd></div>
   <div><dt>Bezahlt</dt><dd>{{ totals.paid|eur }}</dd></div>
   <div><dt>Offen</dt><dd>{{ totals.open|eur }}{% if totals.overdue %} <span class="badge badge-overdue">{{ totals.overdue }} überfällig</span>{% endif %}</dd></div>
+  {% if totals.cancellations %}<div><dt>Stornorechnungen</dt><dd><a href="{{ url_for('web.invoice_list', status='storno', year=year or None) }}">{{ totals.cancellations }}</a></dd></div>{% endif %}
+  {% if totals.refunds_open %}<div><dt>Erstattung offen</dt><dd>{{ totals.refunds_open|eur }}</dd></div>{% endif %}
 </dl>
 
 {% include "_turnover.html" %}
@@ -45,6 +48,7 @@
   <p class="hint">Ausgaben ohne Anlagegüter. Anlagegüter werden über die Nutzungsdauer abgeschrieben (AfA); Anlagenverzeichnis und AfA werden außerhalb des Programms geführt, der Überschuss ist deshalb vor AfA.</p>
   <dl class="stats">
     <div><dt>Einnahmen</dt><dd>{{ cash.income|eur }}</dd></div>
+    {% if cash.refunds %}<div><dt>Erstattungen <small>(Stornorechnungen)</small></dt><dd>{{ cash.refunds|eur }}</dd></div>{% endif %}
     <div><dt>Ausgaben</dt><dd><a href="{{ url_for('web.expense_list', year=cash.year or None, status='paid') }}">{{ cash.expenses|eur }}</a></dd></div>
     {% if cash.assets %}<div><dt>Anlagegüter <small>(nicht abgezogen)</small></dt><dd><a href="{{ url_for('web.expense_list', year=cash.year or None, asset=1) }}">{{ cash.assets|eur }}</a></dd></div>{% endif %}
     <div><dt>Überschuss vor AfA</dt><dd class="{{ 'negative' if cash.surplus_before_afa < 0 }}">{{ cash.surplus_before_afa|eur }}</dd></div>
@@ -67,7 +71,10 @@
       <td class="truncate" title="{{ r.title }}">{{ r.title }}</td>
       <td class="num">{{ r.amount_cents|eur }}</td>
       <td>
-        {% if r.status == 'open' and r.due_date and r.due_date < today %}
+        {% if r.kind == 'cancellation' %}
+          <span class="badge badge-cancelled">Storno</span>
+          <span class="badge badge-{{ 'paid' if r.status == 'paid' else 'open' }}">{{ status_label(r.kind, r.status) }}</span>
+        {% elif r.status == 'open' and r.due_date and r.due_date < today %}
           <span class="badge badge-overdue">Überfällig</span>
         {% else %}
           <span class="badge badge-{{ r.status }}">{{ status_labels[r.status] }}</span>

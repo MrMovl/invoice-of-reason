@@ -329,12 +329,21 @@ def verify_all(conn: sqlite3.Connection, expenses_dir: Path) -> list[tuple[str, 
 
 
 def cash_summary(conn: sqlite3.Connection, year: str = "") -> dict:
-    """Income and expenses by payment date (Zufluss-/Abflussprinzip), optionally for one year."""
+    """Income and expenses by payment date (Zufluss-/Abflussprinzip), optionally for one year.
+
+    Income is every receipt of an invoice (kind ''), also of one cancelled later by a cancellation
+    document: the receipt stays in its year. Refunds recorded on cancellation documents are a
+    separate line in the year they are paid out. Cancellation documents never count as income."""
     year_ok = bool(re.fullmatch(r"\d{4}", year))
+    in_year = " AND substr(paid_date, 1, 4) = ?" if year_ok else ""
+    params = (year,) if year_ok else ()
     income = conn.execute(
-        "SELECT COALESCE(SUM(amount_cents), 0) FROM invoices WHERE status = 'paid'"
-        + (" AND substr(paid_date, 1, 4) = ?" if year_ok else ""),
-        (year,) if year_ok else (),
+        "SELECT COALESCE(SUM(amount_cents), 0) FROM invoices WHERE kind = '' AND paid_date IS NOT NULL"
+        " AND status IN ('paid', 'cancelled')" + in_year, params,
+    ).fetchone()[0]
+    refunds = -conn.execute(
+        "SELECT COALESCE(SUM(amount_cents), 0) FROM invoices WHERE kind = 'cancellation' AND status = 'paid'"
+        " AND paid_date IS NOT NULL" + in_year, params,
     ).fetchone()[0]
     spent, assets = conn.execute(
         "SELECT COALESCE(SUM(CASE WHEN treatment = '' THEN amount_cents END), 0),"
@@ -347,8 +356,8 @@ def cash_summary(conn: sqlite3.Connection, year: str = "") -> dict:
         "SELECT COUNT(*) FROM expenses WHERE reviewed = 0 AND status != 'void'").fetchone()[0]
     # Assets are not deductible at once; their AfA is calculated outside the tool, so the surplus
     # shown here is before AfA.
-    return {"year": year if year_ok else "", "income": income, "expenses": spent, "assets": assets,
-            "surplus_before_afa": income - spent, "to_review": to_review,
+    return {"year": year if year_ok else "", "income": income, "refunds": refunds, "expenses": spent,
+            "assets": assets, "surplus_before_afa": income - refunds - spent, "to_review": to_review,
             "reverse_charge": reverse_charge_summary(conn, int(year) if year_ok else date.today().year)}
 
 

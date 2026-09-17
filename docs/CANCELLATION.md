@@ -1,7 +1,18 @@
 # Cancellation document: design proposal
 
-Status: **proposal, not implemented.** Implements docs/GOBD.md #9 once approved. Questions that
-need the Steuerberater are marked **(StB)** and collected in docs/GOBD.md.
+Status: **implemented** (docs/GOBD.md #9). This file describes the design as built; the sections
+below are kept for the reasoning. Decisions taken with it:
+
+- Numbering: next number of the same sequence. Title "Stornorechnung". *(decided)*
+- Storage: a row in `invoices` with `kind` and `cancels_invoice_id`. *(decided)*
+- Change against the original proposal: the cancellation row of an unpaid original keeps the status
+  value `cancelled` (no CHECK rebuild); for `kind = 'cancellation'` the labels are "Keine
+  Erstattung" / "Erstattung offen" / "Erstattet", never "Storniert". *(decided)*
+- Refunds reduce the income of the year they are paid out; the original receipt stays in its year.
+  *(decided)* Whether a refund also reduces the § 19 Gesamtumsatz of that year is **still open** and
+  listed in docs/GOBD.md; until then the turnover monitor subtracts nothing.
+- Whether a Kleinunternehmer needs a cancellation document at all for a sent invoice is **still
+  open** (docs/GOBD.md); the tool offers it either way.
 
 ## Problem
 
@@ -40,7 +51,7 @@ definition reached the customer. Both statements are logged, so a wrong choice i
 - The "Abweichende Nummer" override applies unchanged if someone deviates.
 
 Whether a separate sequence is preferred for the customer's bookkeeping is a matter of taste, not
-of law as far as I can tell. **(StB)**
+of law as far as I can tell. Decided: same sequence.
 
 ## 3. Storage
 
@@ -93,9 +104,9 @@ year). A cancellation never counts as income; a refund reduces income in the yea
 as a separate line than as negative income is a presentation choice; proposal: separate
 "Erstattungen" line, surplus computed from both.
 
-**Turnover monitor.** Receipts as above. Whether refunds reduce the Gesamtumsatz of the refund
-year, or the receipt year, is open. **(StB)** Until clarified, the monitor subtracts nothing and
-says so (safe side).
+**Turnover monitor.** Receipts as above (`turnover.RECEIPTS_SQL`). Whether refunds reduce the
+Gesamtumsatz of the refund year, or the receipt year, is open (docs/GOBD.md). Until clarified, the
+monitor subtracts nothing and says so on the status block (safe side).
 
 **Lists and totals.** The invoice list shows cancellation rows with a "Storno" badge and negative
 amount; "Umsatz" and "Offen" exclude `kind = 'cancellation'`; a separate "Erstattung offen" figure
@@ -113,8 +124,8 @@ the tool existed would need `--kind cancellation --cancels 2026-00X`; not propos
 Rendered by the existing layout with a small variant; the fields follow the invoice, which is built
 for § 34a UStDV:
 
-- Title: **"Stornorechnung"**. Not "Gutschrift", which in VAT law means self-billing by the
-  recipient (§ 14 Abs. 2 UStG). "Rechnungskorrektur" is the alternative. **(StB)**
+- Title: **"Stornorechnung"** (decided). Not "Gutschrift", which in VAT law means self-billing by
+  the recipient (§ 14 Abs. 2 UStG). "Rechnungskorrektur" would be the alternative.
 - Reference line directly under the title: "Storno der Rechnung Nr. 2026-003 vom 16.09.2026".
 - Sender block and footer as on invoices: name, address, Steuernummer (§ 34a UStDV).
 - Customer name and address copied from the original row (not from current input).
@@ -145,12 +156,13 @@ for § 34a UStDV:
 - The already existing loss of `paid_date` on cancelled paid invoices cannot be undone for data
   created before the change; the events still show the old payment date.
 
-## Implementation outline (after approval)
+## As built
 
-1. Migration: `kind`, `cancels_invoice_id`, unique index, consistency trigger, recreated
-   `invoices_immutable`; test on a pre-migration database with `invoices verify`.
-2. `archive.cancel_invoice(conn, archive_dir, invoice_id, reason, sent: bool, sender, …)`; guard in
-   `set_status`; refund via `set_status` on the cancellation row.
-3. PDF variant, detail pages, list badges and totals, cash_summary and turnover changes.
-4. Export descriptions and foreign key, Verfahrensdokumentation 2.3, 3.2, 5 and the migration
-   table, GOBD.md status.
+- Migration 7: `kind`, `cancels_invoice_id`, unique index `idx_invoices_cancels`, trigger
+  `invoices_cancellation_reference`, recreated `invoices_immutable` with both columns. `init_db`
+  restores a dropped trigger from its latest definition, not from the base schema.
+- `archive.cancel_unsent` (status only, unpaid invoices) and `archive.cancel_invoice` (document);
+  guards in `set_status`; refunds are `set_status` on the cancellation row.
+- `pdf.Cancellation` turns the invoice layout into the Stornorechnung.
+- Sums filter by `kind`: `expenses.cash_summary` (income, new `refunds`), `turnover.RECEIPTS_SQL`
+  and the open projection, the list totals, the export README.

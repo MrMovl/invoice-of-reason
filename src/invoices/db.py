@@ -271,6 +271,37 @@ MIGRATIONS: list[tuple[str, str | Callable[[sqlite3.Connection], None]]] = [
             CHECK (treatment IN ('', 'asset'));
         """,
     ),
+    (
+        "cancellation documents on invoices",
+        # docs/CANCELLATION.md. kind '' = invoice, 'cancellation' = Stornorechnung referring to its
+        # original. Defaults '' / NULL keep record hashes valid. Both columns are identity fields, so
+        # the immutability trigger is recreated with them; it keeps its name for the trigger check.
+        """
+        ALTER TABLE invoices ADD COLUMN kind TEXT NOT NULL DEFAULT ''
+            CHECK (kind IN ('', 'cancellation'));
+        ALTER TABLE invoices ADD COLUMN cancels_invoice_id INTEGER REFERENCES invoices(id);
+        CREATE UNIQUE INDEX idx_invoices_cancels ON invoices(cancels_invoice_id)
+            WHERE cancels_invoice_id IS NOT NULL;
+        DROP TRIGGER invoices_immutable;
+        CREATE TRIGGER invoices_immutable
+        BEFORE UPDATE OF number, issue_date, service_date, due_date, customer_name,
+            customer_street, customer_city, title, description, amount_cents, source,
+            pdf_path, pdf_sha256, pdf_size, payload_json, retain_until, created_at,
+            kind, cancels_invoice_id
+        ON invoices
+        BEGIN
+            SELECT RAISE(ABORT, 'archived invoice fields are immutable');
+        END;
+        CREATE TRIGGER invoices_cancellation_reference
+        BEFORE INSERT ON invoices
+        WHEN (NEW.kind = 'cancellation') != (NEW.cancels_invoice_id IS NOT NULL)
+            OR (NEW.cancels_invoice_id IS NOT NULL AND NOT EXISTS (
+                SELECT 1 FROM invoices WHERE id = NEW.cancels_invoice_id AND kind = ''))
+        BEGIN
+            SELECT RAISE(ABORT, 'a cancellation must refer to exactly one invoice');
+        END;
+        """,
+    ),
 ]
 
 
@@ -285,8 +316,14 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.commit()
     migrate(conn)
     if missing:
-        # The schema script has just restored them. Keep a permanent trace (GoBD Rz. 108).
+        # Restore every missing trigger in its latest definition (the schema script alone would
+        # bring back an outdated invoices_immutable and none from migrations), and keep a permanent
+        # trace (GoBD Rz. 108).
+        definitions = trigger_definitions(schema_version(conn))
         with conn:
+            for name in missing:
+                conn.execute(f"DROP TRIGGER IF EXISTS {name}")
+                conn.execute(definitions[name])
             add_system_event(conn, "trigger_missing", ", ".join(missing))
 
 
@@ -434,6 +471,19 @@ def expected_triggers(version: int) -> set[str]:
     scripts = [SCHEMA] + [sql for _desc, sql in MIGRATIONS[:version] if isinstance(sql, str)]
     pattern = re.compile(r"CREATE TRIGGER (?:IF NOT EXISTS )?(\w+)", re.IGNORECASE)
     return {name for script in scripts for name in pattern.findall(script)}
+
+
+def trigger_definitions(version: int) -> dict[str, str]:
+    """Latest CREATE TRIGGER statement per name, up to a migration version."""
+    scripts = [SCHEMA] + [sql for _desc, sql in MIGRATIONS[:version] if isinstance(sql, str)]
+    pattern = re.compile(r"^\s*CREATE TRIGGER (?:IF NOT EXISTS )?(\w+)", re.IGNORECASE)
+    definitions = {}
+    for script in scripts:
+        for statement in _statements(script):
+            match = pattern.match(statement)
+            if match:
+                definitions[match.group(1)] = statement
+    return definitions
 
 
 def missing_triggers(conn: sqlite3.Connection) -> list[str]:

@@ -58,6 +58,7 @@ SMALL_BUSINESS_NOTE = (
     "Für diese Leistung gilt die Steuerbefreiung für Kleinunternehmer (§ 19 UStG). "
     "Es wird keine Umsatzsteuer berechnet."
 )
+OLD_SMALL_BUSINESS_NOTE = "Gemäß § 19 UStG wird keine Umsatzsteuer berechnet."
 NOTE_FONT, NOTE_SIZE, NOTE_LEADING = "Lora-Italic", 8.5, 12
 
 
@@ -104,6 +105,20 @@ class InvoiceData:
     title: str
     description: str
     amount: Decimal
+
+
+@dataclass(frozen=True)
+class Cancellation:
+    """Turns the invoice layout into a Stornorechnung (docs/CANCELLATION.md)."""
+
+    original_number: str
+    original_date: date
+    refund: bool             # the original was paid, so the amount is refunded
+    small_business_note: str  # as printed on the original
+
+    @property
+    def reference(self) -> str:
+        return f"Storno der Rechnung Nr. {self.original_number} vom {format_date(self.original_date)}"
 
 
 def format_date(d: date) -> str:
@@ -211,14 +226,15 @@ def _para_text(text: str) -> str:
     return escape(text.strip()).replace("\n", "<br/>")
 
 
-def render_invoice(data: InvoiceData, sender: Sender) -> bytes:
-    """Render the invoice and return the PDF bytes."""
+def render_invoice(data: InvoiceData, sender: Sender, cancellation: Cancellation | None = None) -> bytes:
+    """Render the invoice, or with `cancellation` its Stornorechnung, and return the PDF bytes."""
     register_fonts()
     buf = io.BytesIO()
     c = rl_canvas.Canvas(buf, pagesize=A4, invariant=1)
-    c.setTitle(f"Rechnung {data.number}")
+    doc_title = "Stornorechnung" if cancellation else "Rechnung"
+    c.setTitle(f"{doc_title} {data.number}")
     c.setAuthor(sender.name)
-    c.setSubject(f"Rechnung {data.number} an {data.customer_name}")
+    c.setSubject(f"{doc_title} {data.number} an {data.customer_name}")
     c.setCreator("invoice-of-reason")
 
     # Background
@@ -284,7 +300,7 @@ def render_invoice(data: InvoiceData, sender: Sender) -> bytes:
     # ── RECHNUNG TITLE ────────────────────────────────────────────────────
     c.setFillColor(TEAL)
     c.setFont("Lora", 32)
-    c.drawString(LM, cur, "Rechnung")
+    c.drawString(LM, cur, doc_title)
 
     cur -= 3 * mm
     # Gold divider line
@@ -293,17 +309,33 @@ def render_invoice(data: InvoiceData, sender: Sender) -> bytes:
     c.line(LM, cur, W - RM, cur)
     cur -= 9 * mm
 
+    if cancellation:
+        # The reference to the original, directly under the title (GoBD Rz. 64).
+        c.setFillColor(TEAL)
+        c.setFont("Lora-Italic", 11)
+        c.drawString(LM, cur + 2 * mm, cancellation.reference)
+        cur -= 7 * mm
+
     # ── META TABLE ────────────────────────────────────────────────────────
-    meta_rows = [
-        ("Rechnungsnummer", data.number, True),
-        ("Rechnungsdatum", format_date(data.issue_date), False),
-        ("Liefer-/Leistungsdatum", data.service_date, True),
-        (
-            "Zahlungsziel",
-            f"{data.payment_days} Tage netto, fällig bis {format_date(data.due_date)}",
-            False,
-        ),
-    ]
+    if cancellation:
+        meta_rows = [
+            ("Stornorechnungsnummer", data.number, True),
+            ("Datum der Stornorechnung", format_date(data.issue_date), False),
+            ("Liefer-/Leistungsdatum", data.service_date, True),
+            ("Bezieht sich auf",
+             f"Rechnung Nr. {cancellation.original_number} vom {format_date(cancellation.original_date)}", False),
+        ]
+    else:
+        meta_rows = [
+            ("Rechnungsnummer", data.number, True),
+            ("Rechnungsdatum", format_date(data.issue_date), False),
+            ("Liefer-/Leistungsdatum", data.service_date, True),
+            (
+                "Zahlungsziel",
+                f"{data.payment_days} Tage netto, fällig bis {format_date(data.due_date)}",
+                False,
+            ),
+        ]
     row_h = 7 * mm
     for label, value, shaded in meta_rows:
         if shaded:
@@ -313,7 +345,7 @@ def render_invoice(data: InvoiceData, sender: Sender) -> bytes:
         c.setFont("Poppins-Light", 7.5)
         c.drawString(LM + 3 * mm, cur - 4.5 * mm, label)
         c.setFillColor(TEAL)
-        font = "Poppins-Bold" if label == "Rechnungsnummer" else "Poppins"
+        font = "Poppins-Bold" if label in ("Rechnungsnummer", "Stornorechnungsnummer") else "Poppins"
         c.setFont(font, 8)
         c.drawString(LM + 70 * mm, cur - 4.5 * mm, value)
         cur -= row_h
@@ -383,28 +415,42 @@ def render_invoice(data: InvoiceData, sender: Sender) -> bytes:
     cur -= 9 * mm
 
     # ── §19 NOTE ──────────────────────────────────────────────────────────
-    cur -= draw_note(c, SMALL_BUSINESS_NOTE, cur)
+    cur -= draw_note(c, cancellation.small_business_note if cancellation else SMALL_BUSINESS_NOTE, cur)
     cur -= 14 * mm
 
-    # ── BANKVERBINDUNG ────────────────────────────────────────────────────
-    c.setFillColor(GOLD)
-    c.setFont("Lora-Italic", 10)
-    c.drawString(LM, cur, "Bankverbindung")
-    cur -= 7 * mm
-
-    bank = [
-        ("Kontoinhaber", sender.account_holder),
-        ("IBAN", sender.iban),
-        ("BIC", sender.bic),
-    ]
-    for label, val in bank:
-        c.setFillColor(MGRAY)
-        c.setFont("Poppins-Light", 7.5)
-        c.drawString(LM, cur, label + ":")
+    if cancellation:
+        # ── ERSTATTUNG / GEGENSTANDSLOS ───────────────────────────────────
+        c.setFillColor(GOLD)
+        c.setFont("Lora-Italic", 10)
+        c.drawString(LM, cur, "Hinweis")
+        cur -= 7 * mm
         c.setFillColor(TEAL)
         c.setFont("Poppins", 8)
-        c.drawString(LM + 28 * mm, cur, val)
+        if cancellation.refund:
+            c.drawString(LM, cur, f"Der Betrag von {format_amount(abs(data.amount))} wird erstattet.")
+        else:
+            c.drawString(LM, cur, f"Die Rechnung Nr. {cancellation.original_number} ist damit gegenstandslos.")
         cur -= 5 * mm
+    else:
+        # ── BANKVERBINDUNG ────────────────────────────────────────────────
+        c.setFillColor(GOLD)
+        c.setFont("Lora-Italic", 10)
+        c.drawString(LM, cur, "Bankverbindung")
+        cur -= 7 * mm
+
+        bank = [
+            ("Kontoinhaber", sender.account_holder),
+            ("IBAN", sender.iban),
+            ("BIC", sender.bic),
+        ]
+        for label, val in bank:
+            c.setFillColor(MGRAY)
+            c.setFont("Poppins-Light", 7.5)
+            c.drawString(LM, cur, label + ":")
+            c.setFillColor(TEAL)
+            c.setFont("Poppins", 8)
+            c.drawString(LM + 28 * mm, cur, val)
+            cur -= 5 * mm
 
     # The last bank line sits at cur + 5mm; it must stay above the footer waves.
     if cur + 5 * mm < WAVE_ZONE_Y + 6 * mm:

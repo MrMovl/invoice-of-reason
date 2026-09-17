@@ -1,32 +1,38 @@
 {% extends "base.html" %}
-{% block title %}Rechnung {{ inv.number }}{% endblock %}
+{% block title %}{{ 'Stornorechnung' if inv.kind == 'cancellation' else 'Rechnung' }} {{ inv.number }}{% endblock %}
 {% block content %}
+{% set storno = inv.kind == 'cancellation' %}
 <div class="page-head">
-  <h1>Rechnung {{ inv.number }}</h1>
+  <h1>{{ 'Stornorechnung' if storno else 'Rechnung' }} {{ inv.number }}</h1>
   <div class="actions">
     <a class="btn" href="{{ url_for('web.invoice_pdf', invoice_id=inv.id, inline=1) }}" target="_blank" rel="noopener">Ansehen</a>
     <a class="btn btn-primary" href="{{ url_for('web.invoice_pdf', invoice_id=inv.id) }}">PDF herunterladen</a>
-    <a class="btn" href="{{ url_for('web.invoice_new', **{'from': inv.id}) }}">Als Vorlage</a>
+    {% if not storno %}<a class="btn" href="{{ url_for('web.invoice_new', **{'from': inv.id}) }}">Als Vorlage</a>{% endif %}
   </div>
 </div>
 
 {% if problem %}
 <p class="flash flash-error" role="alert">Integritätsproblem: {{ problem }}. Aus Backup wiederherstellen.</p>
 {% endif %}
+{% if links.cancels %}
+<p class="flash flash-warn">Storno der Rechnung <a href="{{ url_for('web.invoice_detail', invoice_id=links.cancels.id) }}">{{ links.cancels.number }}</a> vom {{ links.cancels.issue_date|de_date }}.</p>
+{% elif links.cancelled_by %}
+<p class="flash flash-warn">Storniert durch die Stornorechnung <a href="{{ url_for('web.invoice_detail', invoice_id=links.cancelled_by.id) }}">{{ links.cancelled_by.number }}</a> ({{ status_label('cancellation', links.cancelled_by.status) }}).</p>
+{% endif %}
 
 <div class="detail-grid">
   <section class="card">
     <h2>Details</h2>
     <dl class="kv">
-      <dt>Status</dt>
+      <dt>{{ 'Erstattung' if storno else 'Status' }}</dt>
       <dd>
-        {% if inv.status == 'open' and inv.due_date and inv.due_date < today %}<span class="badge badge-overdue">Überfällig</span>
-        {% else %}<span class="badge badge-{{ inv.status }}">{{ status_labels[inv.status] }}</span>{% endif %}
+        {% if not storno and inv.status == 'open' and inv.due_date and inv.due_date < today %}<span class="badge badge-overdue">Überfällig</span>
+        {% else %}<span class="badge badge-{{ 'open' if storno and inv.status == 'cancelled' else inv.status }}">{{ status_label(inv.kind, inv.status) }}</span>{% endif %}
         {% if inv.paid_date %} am {{ inv.paid_date|de_date }}{% endif %}
       </dd>
-      {% if inv.status == 'paid' %}<dt>Zahlungsart</dt><dd>{{ payment_labels.get(inv.payment_method, '–') }}</dd>{% endif %}
+      {% if inv.paid_date %}<dt>Zahlungsart</dt><dd>{{ payment_labels.get(inv.payment_method, '–') }}</dd>{% endif %}
       <dt>Betrag</dt><dd><strong>{{ inv.amount_cents|eur }}</strong></dd>
-      <dt>Rechnungsdatum</dt><dd>{{ inv.issue_date|de_date }}</dd>
+      <dt>{{ 'Datum' if storno else 'Rechnungsdatum' }}</dt><dd>{{ inv.issue_date|de_date }}</dd>
       <dt>Leistungsdatum</dt><dd>{{ inv.service_date }}</dd>
       <dt>Fällig</dt><dd>{{ inv.due_date|de_date or '–' }}</dd>
       <dt>Kunde</dt><dd>{{ inv.customer_name }}{% if inv.customer_street %}<br>{{ inv.customer_street }}{% endif %}{% if inv.customer_city %}<br>{{ inv.customer_city }}{% endif %}</dd>
@@ -35,8 +41,35 @@
   </section>
 
   <section class="card">
+    {% if storno %}
+    <h2>Erstattung</h2>
+    {% if inv.status == 'cancelled' %}
+    <p class="hint">Die ursprüngliche Rechnung war nicht bezahlt; es gibt nichts zu erstatten.</p>
+    {% elif inv.status == 'open' %}
+    <form method="post" action="{{ url_for('web.invoice_status', invoice_id=inv.id) }}" class="row">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="paid">
+      <label>Erstattet am <input type="date" name="paid_date" value="{{ today }}" required></label>
+      <label>Zahlungsart
+        <select name="payment_method" required>
+          <option value="">Bitte wählen</option>
+          {% for key in ('bank', 'cash') %}<option value="{{ key }}">{{ payment_labels[key] }}</option>{% endfor %}
+        </select>
+      </label>
+      <button class="btn btn-primary" type="submit">Erstattung erfassen</button>
+      <p class="hint">Die Erstattung mindert die Einnahmen im Jahr der Auszahlung; der ursprüngliche Zahlungseingang bleibt in seinem Jahr.</p>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('web.invoice_status', invoice_id=inv.id) }}" class="row">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="open">
+      <button class="btn" type="submit">Erstattung zurücknehmen</button>
+      <p class="hint">Nur wenn die Erstattung irrtümlich erfasst wurde (wird protokolliert).</p>
+    </form>
+    {% endif %}
+    {% else %}
     <h2>Zahlung</h2>
-    {% if inv.status != 'paid' %}
+    {% if inv.status == 'open' %}
     <form method="post" action="{{ url_for('web.invoice_status', invoice_id=inv.id) }}" class="row">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="status" value="paid">
@@ -51,26 +84,25 @@
       <p class="hint">Bar: Einnahme am Tag des Zahlungseingangs erfassen (GoBD Rz. 48).</p>
     </form>
     {% endif %}
-    {% if inv.status != 'open' %}
+    {% if inv.status != 'open' and not links.cancelled_by %}
     <form method="post" action="{{ url_for('web.invoice_status', invoice_id=inv.id) }}" class="row">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="status" value="open">
       <button class="btn" type="submit">Wieder auf offen setzen</button>
     </form>
     {% endif %}
-    {% if inv.status == 'paid' %}
-    <p class="hint">Stornieren: Eine bezahlte Rechnung braucht eine Stornorechnung und die Erfassung der Erstattung. Diese Funktion folgt in Kürze. War die Zahlung irrtümlich erfasst, zuerst „Wieder auf offen setzen“.</p>
-    {% elif inv.status != 'cancelled' %}
+    {% if not links.cancelled_by %}
     <details>
-      <summary>Stornieren</summary>
-      <form method="post" action="{{ url_for('web.invoice_status', invoice_id=inv.id) }}" class="row">
+      <summary>{{ 'Stornorechnung nachträglich erstellen' if inv.status == 'cancelled' else 'Stornieren' }}</summary>
+      <form method="post" action="{{ url_for('web.invoice_cancel', invoice_id=inv.id) }}" class="row">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="status" value="cancelled">
-        <label>Grund <input name="note" maxlength="500" required></label>
-        <button class="btn btn-danger" type="submit">Stornieren</button>
+        <label>Grund <input name="reason" maxlength="500" required></label>
+        <button class="btn btn-danger" type="submit" name="mode" value="sent">Stornorechnung erstellen</button>
+        {% if inv.status == 'open' %}<button class="btn" type="submit" name="mode" value="unsent">Stornieren – wurde nicht versandt</button>{% endif %}
       </form>
-      <p class="hint">Die Rechnung bleibt archiviert. Für eine formale Stornorechnung eine neue Rechnung erstellen.</p>
+      <p class="hint">Hat der Kunde die Rechnung erhalten, braucht er eine Stornorechnung: Sie erhält die nächste Nummer, verweist auf diese Rechnung und wird unveränderbar archiviert.{% if inv.status == 'paid' %} Die Zahlung bleibt erfasst; die Erstattung wird auf der Stornorechnung eingetragen.{% elif inv.status == 'open' %} Nur wenn die Rechnung nie versandt wurde, genügt das Stornieren ohne Stornorechnung.{% endif %} Beides kann nicht rückgängig gemacht werden.</p>
     </details>
+    {% endif %}
     {% endif %}
 
     <h2>Notizen</h2>

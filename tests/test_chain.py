@@ -39,6 +39,27 @@ def populate(s, conn, paid=True):
     return inv_id, exp_id
 
 
+def populate_raw(conn, paid=True):
+    """Rows written directly, for databases still at an older schema version: today's write paths
+    use columns that a later migration adds."""
+    with conn:
+        conn.execute("""INSERT INTO invoices (number, issue_date, service_date, customer_name, title,
+                        amount_cents, status, paid_date, source, pdf_path, pdf_sha256, pdf_size,
+                        payload_json, retain_until, created_at, updated_at)
+                        VALUES ('2026-001', '2026-09-16', '16.09.2026', 'Kunde', 'Beratung', 70000,
+                        ?, ?, 'generated', '2026/a.pdf', 'sha', 1, '{}', '2036-12-31', 'now', 'now')""",
+                     ("paid" if paid else "open", "2026-09-20" if paid else None))
+        db.add_event(conn, 1, "created", "sha256=sha")
+        conn.execute("""INSERT INTO expenses (vendor, amount_cents, expense_date, status, doc_path,
+                        doc_sha256, doc_size, doc_type, suggestion_json, retain_until, created_at, updated_at)
+                        VALUES ('Bauhaus', 4999, '2026-09-10', 'paid', '2026/b.png', 'sha2', 1, 'png',
+                        '{}', '2036-12-31', 'now', 'now')""")
+        db.add_expense_event(conn, 1, "uploaded", "sha256=sha2")
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'control_runs'").fetchone():
+        system.control_run(conn, "verify", True, "ok")
+    return 1, 1
+
+
 def tamper(conn, trigger, sql, params=()):
     """What someone with the database file could do: drop the protection, change, restore it."""
     trigger_sql = conn.execute("SELECT sql FROM sqlite_master WHERE name = ?", (trigger,)).fetchone()[0]
@@ -114,8 +135,7 @@ def test_migration_seals_existing_data(env, monkeypatch):
     chain_migration = next(i for i, (desc, _) in enumerate(db.MIGRATIONS) if desc == "hash chain over all logs")
     monkeypatch.setattr(db, "MIGRATIONS", db.MIGRATIONS[:chain_migration])
     db.init_db(conn)
-    # Only operations the older schema supports (payment_method comes in a later migration).
-    inv_id, exp_id = populate(s, conn, paid=False)
+    inv_id, exp_id = populate_raw(conn, paid=False)
     before = conn.execute("SELECT id, action, detail FROM events ORDER BY id").fetchall()
     monkeypatch.undo()
 
@@ -154,9 +174,7 @@ def test_production_database_migrates_cleanly_through_all_migrations(env, monkey
     conn = db.connect(s.db_path)
     monkeypatch.setattr(db, "MIGRATIONS", [])
     db.init_db(conn)
-    inv_id = issue(s, conn)
-    archive.set_notes(conn, inv_id, "vor der Migration")
-    expenses.store_upload(conn, s.expenses_dir, PNG, "a.png", s.retention_years)
+    inv_id, _exp_id = populate_raw(conn)
     monkeypatch.undo()
 
     db.init_db(conn)

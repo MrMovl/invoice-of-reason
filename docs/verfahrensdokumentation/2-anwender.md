@@ -62,13 +62,37 @@ und neuem Wert im Verlauf.
 „Stornieren“ mit Pflichtangabe eines Grundes. Die Rechnung bleibt mit Nummer und PDF im Archiv, hat
 den Status „Storniert“ und zählt nicht zu den Einnahmen. Die Nummer bleibt vergeben (keine Lücke).
 
-Eine **bezahlte** Rechnung kann nicht auf diese Weise storniert werden: Der Zahlungseingang ist eine
-Tatsache und bleibt erhalten; rückgängig gemacht wird er nur durch eine Erstattung, die mit einer
-Stornorechnung erfasst wird. War die Zahlung irrtümlich erfasst, wird sie mit „Wieder auf offen
-setzen“ zurückgenommen (protokolliert); danach ist das Stornieren möglich. Die Rechnungsliste meldet
-stornierte Rechnungen, die unmittelbar vor dem Stornieren als bezahlt erfasst waren (Stand vor
-dieser Sperre), weil ihr Zahlungseingang in Übersicht und Umsatzgrenze fehlt. Die Meldung ändert
-nichts an den Daten.
+Es gibt zwei Wege, je nachdem, ob der Kunde die Rechnung erhalten hat. Beide verlangen einen Grund
+und sind nicht umkehrbar.
+
+**Nicht versandt** (nur bei offenen Rechnungen): „Stornieren – wurde nicht versandt“. Die Rechnung
+bekommt den Status „Storniert“, der Grund steht im Verlauf, es entsteht kein weiteres Dokument.
+
+**Versandt: Stornorechnung erstellen.** Das Programm erzeugt ein eigenes Dokument:
+
+- Es erhält die nächste Nummer desselben Nummernkreises, trägt den Titel „Stornorechnung“, verweist
+  auf Nummer und Datum der Rechnung, zeigt den Betrag negativ und denselben Hinweis auf die
+  Kleinunternehmerregelung wie die ursprüngliche Rechnung.
+- Es wird wie eine Rechnung unveränderbar archiviert (Prüfsumme, Verlauf); beide Dokumente sind in
+  beide Richtungen verlinkt, im Verlauf und in der Übersicht.
+- Die ursprüngliche Rechnung erhält den Status „Storniert“ und behält Zahlungsdatum und
+  Zahlungsart, falls sie bezahlt war. Ihr Status kann danach nicht mehr geändert werden.
+- War die Rechnung **nicht** bezahlt, steht auf der Stornorechnung „Keine Erstattung“ und im PDF,
+  dass die Rechnung gegenstandslos ist.
+- War sie **bezahlt**, steht dort „Erstattung offen“ und im PDF, dass der Betrag erstattet wird.
+  Nach der Auszahlung wird sie mit „Erstattung erfassen“ (Datum, Zahlungsart) auf „Erstattet“
+  gesetzt. Die Erstattung mindert die Einnahmen im Jahr der Auszahlung; der ursprüngliche
+  Zahlungseingang bleibt im Jahr seines Eingangs.
+- Für die Umsatzgrenzen (§ 19 UStG) zählt der ursprüngliche Zahlungseingang weiter; Erstattungen
+  werden nicht abgezogen, solange nicht geklärt ist, in welchem Jahr sie den Umsatz mindern (2.1).
+
+Eine **bezahlte** Rechnung kann nicht ohne Stornorechnung storniert werden: Der Zahlungseingang ist
+eine Tatsache und bleibt erhalten; rückgängig gemacht wird er nur durch eine Erstattung. War die
+Zahlung irrtümlich erfasst, wird sie mit „Wieder auf offen setzen“ zurückgenommen (protokolliert).
+Für eine früher ohne Dokument stornierte Rechnung kann eine Stornorechnung nachträglich erstellt
+werden. Die Rechnungsliste meldet stornierte Rechnungen, die unmittelbar vor dem Stornieren als
+bezahlt erfasst waren (Stand vor dieser Sperre), weil ihr Zahlungseingang in Übersicht und
+Umsatzgrenze fehlt; die Meldung ändert nichts an den Daten.
 
 ## 2.4 Notizen
 
@@ -133,6 +157,9 @@ Beleg bleibt archiviert und zählt nicht zu den Ausgaben.
 
 ## 2.8 Auswertungen und Suche
 
+- Stornorechnungen stehen in der Rechnungsliste mit dem Kennzeichen „Storno“, negativem Betrag und
+  dem Stand der Erstattung; der Filter „Stornorechnungen“ zeigt nur sie. Summen wie „Umsatz“,
+  „Bezahlt“ und „Offen“ enthalten nur Ausgangsrechnungen; offene Erstattungen stehen getrennt.
 - Rechnungsliste: Filter nach Jahr, Status, Suche in Nummer, Kunde, Leistung; Summen; überfällige
   Rechnungen markiert; Einnahmen und Ausgaben je Jahr nach Zahlungsdatum. Als Anlagegut markierte
   Belege sind nicht in den Ausgaben enthalten, sondern werden getrennt als „Anlagegüter“ gezeigt;

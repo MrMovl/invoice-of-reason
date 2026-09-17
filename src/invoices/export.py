@@ -36,7 +36,8 @@ TABLES = {
     "system_events": "Systemprotokoll: Programmversionen, Schemaänderungen, Konfiguration",
     "control_runs": "Kontrollprotokoll: Integritätsprüfungen, Backups, Wiederherstellungstests, Exporte",
 }
-FOREIGN_KEYS = {"events": ("invoice_id", "invoices"), "expense_events": ("expense_id", "expenses")}
+FOREIGN_KEYS = {"events": ("invoice_id", "invoices"), "expense_events": ("expense_id", "expenses"),
+                "invoices": ("cancels_invoice_id", "invoices")}
 # Columns holding ISO dates (YYYY-MM-DD). Timestamps (UTC, ISO 8601 with time) stay alphanumeric.
 DATE_COLUMNS = {"issue_date", "due_date", "paid_date", "retain_until", "expense_date"}
 # Money is stored as integer cents; each such column gets a derived euro column right after it.
@@ -59,6 +60,8 @@ DESCRIPTIONS = {
     "paid_date": "Zahlungsdatum",
     "notes": "Interne Notiz",
     "source": "Herkunft: generated = im Programm erstellt, imported = importiert",
+    "kind": "Art des Dokuments: leer = Ausgangsrechnung, cancellation = Stornorechnung (negativer Betrag)",
+    "cancels_invoice_id": "Bei einer Stornorechnung: Verweis auf invoices.id der stornierten Rechnung",
     "pdf_path": "Pfad der archivierten PDF im Ordner archive/",
     "pdf_sha256": "SHA-256-Prüfsumme der archivierten PDF",
     "pdf_size": "Dateigröße der PDF in Bytes",
@@ -353,6 +356,7 @@ die Beträge sind Endbeträge.
 
 Verknüpfungen
 -------------
+invoices.cancels_invoice_id -> invoices.id (Stornorechnung -> stornierte Rechnung)
 events.invoice_id          -> invoices.id
 expense_events.expense_id  -> expenses.id
 invoices.pdf_path          -> Datei archive/<pdf_path>, Prüfsumme invoices.pdf_sha256
@@ -368,7 +372,11 @@ sind immer vollständig.
 
 Statuswerte
 -----------
-invoices.status:  open = offen, paid = bezahlt, cancelled = storniert
+invoices.status:  bei Ausgangsrechnungen (kind leer): open = offen, paid = bezahlt,
+                  cancelled = storniert;
+                  bei Stornorechnungen (kind = cancellation) beschreibt der Status die Erstattung:
+                  cancelled = keine Erstattung (die Rechnung war nicht bezahlt), open = Erstattung
+                  offen, paid = erstattet (paid_date = Tag der Auszahlung)
 expenses.status:  paid = bezahlt, open = offen, void = verworfen (z. B. Fehl-Upload; Grund in notes
                   bzw. im Änderungsprotokoll)
 invoices.source:  generated = im Programm erstellt, imported = vor Einführung des Programms
@@ -400,6 +408,15 @@ system_events:   version = Programmversion in Betrieb genommen,
 control_runs:    verify = Integritätsprüfung, backup = Backup,
                  restore_test = Wiederherstellungstest, export = Datenexport
                  (dieser Export selbst wird erst nach seiner Erstellung protokolliert)
+
+Summen über invoices
+--------------------
+Jede Summe ist nach kind zu trennen. Einnahmen sind die Zahlungseingänge der Ausgangsrechnungen
+(kind leer, paid_date gesetzt, status paid oder cancelled): Der Zahlungseingang einer später
+stornierten Rechnung bleibt im Jahr seines Eingangs. Stornorechnungen (kind = cancellation) haben
+einen negativen Betrag und sind nie Einnahmen; eine erstattete Stornorechnung (status paid) mindert
+die Einnahmen im Jahr der Auszahlung (paid_date). Für die Umsatzgrenzen des § 19 UStG zählen nur
+die Zahlungseingänge der Ausgangsrechnungen.
 
 Rechnungen, Belege und Protokolleinträge können im Programm nicht gelöscht werden; die
 identitätsbildenden Felder sind unveränderlich.
