@@ -9,7 +9,8 @@ Upload received invoices and receipts as expenses; amounts are read from the PDF
 - UI in German
 
 See [docs/PLAN.md](docs/PLAN.md) for architecture and decisions, [docs/BACKUP.md](docs/BACKUP.md)
-for backups and restore, [docs/GOBD.md](docs/GOBD.md) for the GoBD compliance plan.
+for backups and restore, [docs/GOBD.md](docs/GOBD.md) for the GoBD compliance plan,
+[docs/verfahrensdokumentation/](docs/verfahrensdokumentation/README.md) for the Verfahrensdokumentation (German).
 
 ## Local development
 

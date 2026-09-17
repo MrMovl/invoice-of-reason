@@ -1,0 +1,41 @@
+# 5. Internes Kontrollsystem (Rz. 100–102)
+
+Einzelunternehmen ohne Mitarbeiter: Funktionstrennung ist nicht möglich. Die Kontrollen sind
+deshalb überwiegend technisch und werden, wo möglich, automatisch protokolliert. Umfang
+entsprechend der Unternehmensgröße (Rz. 15).
+
+## 5.1 Technische Kontrollen im Programm
+
+| Kontrolle | Zweck | Wann | Nachweis |
+|---|---|---|---|
+| Zugangskontrolle | nur berechtigter Zugriff | jede Anfrage | Anmeldung erforderlich (Teil 4.2) |
+| Eingabeprüfung | plausible Daten | bei jeder Eingabe | Fehlermeldung; ungültige Daten werden nicht gespeichert (Beträge > 0, max. 2 Nachkommastellen, gültige Daten, Pflichtfelder, Leistungszeitraum) |
+| Nummernkreis | Vollständigkeit, keine Doppelvergabe | beim Erstellen, laufend in der Rechnungsliste | Nummer eindeutig (Datenbank); abweichende Nummer nur mit Grund im Verlauf; Lückenanzeige |
+| Duplikaterkennung | keine Doppelerfassung von Belegen | beim Hochladen | identische Datei (SHA-256) wird abgelehnt |
+| Prüfpflicht | Richtigkeit automatisch gelesener Werte | jeder Beleg | Status „zu prüfen“ bis zum Speichern; Verlaufseintrag `reviewed` |
+| Fristüberwachung | zeitgerechte Erfassung | laufend | Markierung „über 10 Tage ungeprüft“, überfällige Rechnungen |
+| Pflichtangaben bei Storno/Verwerfen | Nachvollziehbarkeit | bei jeder Stornierung/Verwerfung | Grund im Verlauf |
+| Unveränderbarkeit | Schutz vor Verfälschung | ständig | Trigger, Schreibschutz, Protokoll (Teil 3.3) |
+| Integritätsprüfung | Erkennen von Verfälschung oder Verlust | bei jeder Detailansicht (Datei), Backups-Seite, jeder Sicherung, jedem Export, manuell | Kontrollprotokoll (`verify`, `backup`, `export`) |
+| Datensicherung | Schutz vor Verlust | täglich automatisch | Kontrollprotokoll (`backup`), Sicherungsdateien |
+| Wiederherstellungstest | Nachweis der Wiederherstellbarkeit | mindestens jährlich, zusätzlich nach Programm- oder Serverwechsel | Kontrollprotokoll (`restore_test`) |
+| Programmidentität | nur freigegebene, versionierte Programmstände | jede Auslieferung | `deploy.sh` (nur eingecheckte Stände, Tests), `system_events` (`version`) |
+| Konfigurationshistorie | Nachvollziehbarkeit von Einstellungen | Start, vor jeder Rechnung | `system_events` (`config_changed`) |
+
+Das Kontrollprotokoll (`control_runs`) ist nur anfügbar, Teil der Hash-Kette und auf der
+Backups-Seite einsehbar.
+
+## 5.2 Organisatorische Kontrollen des Unternehmers
+
+| Kontrolle | Häufigkeit | Nachweis |
+|---|---|---|
+| Belege hochladen und prüfen | laufend, spätestens 10 Tage nach Eingang | Erfassungs- und Prüfzeitpunkt im Verlauf |
+| Zahlungseingänge und -ausgänge mit dem Kontoauszug abgleichen, Status und Zahlungsdatum pflegen | monatlich | Verlaufseinträge `status:paid` bzw. `updated` |
+| Warnungen prüfen (Nummernkreis, ungeprüfte Belege, überfällige Rechnungen, Integritätsprüfung) | monatlich | – |
+| Kontrollprotokoll auf fehlgeschlagene Sicherungen prüfen | monatlich | Einträge `backup` |
+| Wiederherstellungstest einer auswärtigen Sicherung | jährlich | Eintrag `restore_test` |
+| Verfahrensdokumentation mit dem eingesetzten Programm abgleichen (Rz. 101) | bei jeder Programmänderung und jährlich | git-Historie dieser Dokumentation |
+| Jahresabschluss: Einnahmen und Ausgaben des Jahres exportieren und mit der EÜR abstimmen | jährlich | Export im Kontrollprotokoll |
+
+Die tatsächlich durchgeführten organisatorischen Kontrollen, soweit nicht automatisch
+protokolliert, werden in Teil 6 festgehalten.

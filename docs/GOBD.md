@@ -99,6 +99,22 @@ Programmidentität. Rules that follow:
   live on the server or in a private repository, never here.
 - Test fixtures stay synthetic.
 
+## Status
+
+| # | Item | State |
+|---|---|---|
+| 1 | Verfahrensdokumentation | public part 1–5 and template for the private part in `docs/verfahrensdokumentation/`; private part 6 to be filled in |
+| 2 | Programmidentität | done |
+| 3 | Complete change log | done |
+| 4 | Z3 export | done; `index.xml` still to be validated against the official DTD or by a test import |
+| 5 | Control log, restore test | done |
+| 6 | Off-site backup | open, needs a decision |
+| 7 | Receive e-invoices | done |
+| 8 | Completeness and timeliness checks | done |
+| 9 | Storno document | open, ask a Steuerberater |
+| 10 | Hash chain, trigger check | done |
+| 11–15 | P3 | open |
+
 ## Order
 
 1. #3 logging fixes, #2 Programmidentität, #5 control log (shared schema foundation)

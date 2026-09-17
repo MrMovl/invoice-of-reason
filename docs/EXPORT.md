@@ -40,8 +40,8 @@ successful or not, is recorded in the control log (`control_runs.kind = export`)
 - **Year filter**: invoices by `issue_date`, expenses by booking date (payment date, else document
   date, else upload day), change logs only for the exported rows. System and control logs are
   always complete.
-- **Integrity**: every document is checked against its SHA-256 first; any mismatch or missing
-  file aborts the export. The table rows are read in one SQLite transaction.
+- **Integrity**: the hash chains, record states and triggers are verified and every document is
+  checked against its SHA-256 first; any problem aborts the export. The table rows are read in one SQLite transaction.
 
 The DTD file itself is not shipped: it is published by the BMF / the IDEA vendor (Audicon), and
 the auditor's software brings it. `DataSupplier` name and location come from `config/sender.toml`
