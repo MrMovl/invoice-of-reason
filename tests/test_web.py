@@ -126,3 +126,24 @@ def test_expense_upload_review_and_overview(logged_in, csrf):
 
     overview = c.get("/invoices?year=2026").get_data(as_text=True)
     assert "Einnahmen und Ausgaben 2026" in overview and "-11,90 €" in overview
+
+
+def test_payment_method_defaults_to_bank(logged_in, csrf, app):
+    """Überweisung/Karte is preselected: the common case, still visible and logged when saved."""
+    from datetime import date
+
+    from invoices import db, expenses
+
+    resp = logged_in.post("/invoices", data={**invoice_form(), "csrf_token": csrf})
+    page = logged_in.get(resp.headers["Location"]).get_data(as_text=True)
+    block = page.split('name="payment_method"', 1)[1].split("</select>", 1)[0]
+    assert 'value="bank" selected' in block and "Bitte wählen" not in block
+
+    s = app.config["SETTINGS"]
+    conn = db.connect(s.db_path)
+    exp_id = expenses.store_upload(conn, s.expenses_dir, b"\x89PNG\r\n\x1a\n" + b"\x00" * 64, "a.png",
+                                   s.retention_years, today=date(2026, 9, 16))
+    conn.close()
+    form = logged_in.get(f"/expenses/{exp_id}").get_data(as_text=True)
+    block = form.split('name="payment_method"', 1)[1].split("</select>", 1)[0]
+    assert 'value="bank" selected' in block
