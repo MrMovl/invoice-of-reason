@@ -153,8 +153,11 @@ Programmidentität. Rules that follow:
 
 ## Questions for the Steuerberater
 
-Open questions found while implementing; not decided in the code. Business-specific questions are
-kept privately outside this repository.
+Found while implementing. "Open" means the code takes a documented position that has not been
+confirmed; "decided" means the position is deliberate and needs no answer. Business-specific
+questions are kept privately outside this repository.
+
+### Open
 
 1. **§ 13b reporting period.** Does the Finanzamt require Umsatzsteuer-Voranmeldungen for the § 13b
    tax of a Kleinunternehmer, or only the annual return? The tool shows quarterly and annual sums
@@ -162,27 +165,36 @@ kept privately outside this repository.
 2. **§ 13b timing.** The tax arises with the end of the period in which the service was performed.
    The tool assigns a purchase to a quarter by its invoice date, as it does not record the service
    period. Is that acceptable, or does the service period need its own field? (#18)
-3. **Assets between 250 € and 1,000 €.** The tool only knows "asset" or "immediately deductible" with
-   the 800 € GWG limit. Should the Sammelposten option (§ 6 Abs. 2a EStG) be supported, and how
+3. **Assets between 250 € and 1,000 €.** The tool only knows "asset" or "immediately deductible"
+   with the 800 € GWG limit. Should the Sammelposten option (§ 6 Abs. 2a EStG) be supported, and how
    should depreciable assets below the limit that are deliberately depreciated be marked? (#19)
 4. **Asset hint on gross amounts.** The hint compares the gross amount with the 800 € net limit, so
    it also appears for net prices between about 673 € and 800 € (at 19 % VAT). Is a net amount field
    worth adding? (#19)
-5. **Income outside the tool.** *Answered:* yes. For VAT a person has one Unternehmen covering all
-   of their self-employed activities (§ 2 Abs. 1 Satz 2 UStG), so the Gesamtumsatz of § 19 includes
-   receipts not invoiced here. Implemented as append-only external receipts (#22). Still open:
-   whether a given activity is unternehmerisch at all, and which receipts therefore belong in it.
-6. **Receipts vs. open invoices in the projection.** The monitor projects all open invoices into
-   the current year and blocks when the projection exceeds the limit. Is blocking on projected
-   (not yet received) amounts the right safety margin, or should only receipts block? (#20)
-7. **Cancellation document needed?** For an invoice the customer already received, is a separate
+5. **Which activities count.** Receipts outside the tool count toward the Gesamtumsatz (see
+   "Decided"), but whether a given activity is unternehmerisch at all, and which of its receipts
+   therefore belong in the monitor, needs an answer per activity. (#22)
+6. **Cancellation document required?** For an invoice the customer already received, is a separate
    cancellation document required for a Kleinunternehmer, or does the status plus reason suffice?
-   Decided in the tool: it offers one, titled "Stornorechnung", numbered in the same sequence
-   (#9, CANCELLATION.md). Open: whether it is required, and whether the customer's bookkeeping
-   prefers "Rechnungskorrektur".
-8. **Refunds and the Gesamtumsatz.** If a paid invoice is cancelled and the money refunded, does the
+   Does the customer's bookkeeping prefer the title "Rechnungskorrektur" over "Stornorechnung"?
+   (#9, CANCELLATION.md)
+7. **Refunds and the Gesamtumsatz.** If a paid invoice is cancelled and the money refunded, does the
    refund reduce the § 19 turnover of the refund year, of the receipt year, or not at all? The tool
-   subtracts nothing and shows the refund separately in the cash overview. (#9, #20)
+   subtracts nothing from the turnover and shows the refund separately in the cash overview, where
+   it counts in the year it is paid out. (#9, #20, #21)
+
+### Decided
+
+- **Income outside the tool counts** (was question 5). For VAT a person has one Unternehmen covering
+  all of their self-employed activities (§ 2 Abs. 1 Satz 2 UStG), so the Gesamtumsatz of § 19
+  includes receipts not invoiced here. Implemented as append-only external receipts (#22); which
+  activities belong in it stays open above.
+- **Blocking on projected amounts stays** (was question 6). The monitor counts open invoices toward
+  the limit and refuses a new § 19 invoice when the projection exceeds it. Once the limit is
+  crossed, later receipts are taxable even for work done earlier, so an open § 19 invoice is a real
+  risk; the exceptions are covered by the override, whose reason is logged. (#20)
+- **Cancellation: same number sequence, title "Stornorechnung", document in `invoices`** with a
+  negative amount and the refund tracked on it. (#9, CANCELLATION.md)
 
 ## Order
 
