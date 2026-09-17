@@ -53,7 +53,8 @@ einschließlich offener Rechnungen, außerhalb des Gründungsjahrs auch den Vorj
 ## 2.2 Zahlungseingang erfassen
 
 Auf der Detailseite der Rechnung „Als bezahlt markieren“ mit Zahlungsdatum und Zahlungsart
-(„Überweisung/Karte“ oder „Bar“). Barzahlungen sind am Tag des Eingangs zu erfassen (Rz. 48).
+(„Überweisung/Karte“ oder „Bar“). Vorbelegt ist „Überweisung/Karte“ als der übliche Fall; bei einer
+Barzahlung ist die Auswahl zu ändern. Barzahlungen sind am Tag des Eingangs zu erfassen (Rz. 48).
 „Wieder auf offen setzen“ nimmt eine irrtümliche Erfassung zurück. Jede Änderung steht mit altem
 und neuem Wert im Verlauf.
 
@@ -124,8 +125,9 @@ Lieferanten, Kategorie, Status und – bei „Bezahlt“ – Zahlungsdatum und Z
 eintragen, dann „Geprüft, speichern“. „Speichern und nächster“ führt durch alle ungeprüften Belege.
 
 - **Kategorie** ist Pflicht; sie ist die sachliche Zuordnung des Belegs (Rz. 50).
-- **Zahlungsart:** „Überweisung/Karte“, „Bar“ oder „Privat bezahlt (Einlage)“ für Ausgaben, die aus
-  privaten Mitteln bezahlt wurden.
+- **Zahlungsart:** „Überweisung/Karte“ (vorbelegt), „Bar“ oder „Privat bezahlt (Einlage)“ für
+  Ausgaben, die aus privaten Mitteln bezahlt wurden. Die Vorbelegung ersetzt keine Prüfung: Der
+  gespeicherte Wert wird wie jede andere Änderung protokolliert.
 - **Zahlungsdatum** leer bedeutet: bezahlt am Rechnungsdatum.
 - **Anlagegut (AfA):** ankreuzen, wenn der Beleg ein abnutzbares Wirtschaftsgut betrifft, das nicht
   sofort abgezogen werden darf, weil der Nettopreis über 800 € liegt (GWG-Grenze, § 6 Abs. 2 EStG).

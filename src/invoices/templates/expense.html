@@ -58,7 +58,8 @@
       <label>Zahlungsart <small>(Pflicht bei „Bezahlt“; bar am selben Tag erfassen, GoBD Rz. 48)</small>
         <select name="payment_method">
           <option value="">–</option>
-          {% for key, label in payment_labels.items() %}<option value="{{ key }}" {{ 'selected' if key == form.payment_method }}>{{ label }}</option>{% endfor %}
+          {# Überweisung/Karte is the common case and preselected; the value is still saved and logged like any other. #}
+          {% for key, label in payment_labels.items() %}<option value="{{ key }}" {{ 'selected' if key == (form.payment_method or ('bank' if form.status != 'void' else '')) }}>{{ label }}</option>{% endfor %}
         </select>
       </label>
       <label class="check"><input type="checkbox" name="treatment" value="asset" {{ 'checked' if form.treatment == 'asset' }}> Anlagegut, wird abgeschrieben (AfA)</label>
