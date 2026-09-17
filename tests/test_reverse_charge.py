@@ -138,8 +138,8 @@ def test_migration_keeps_existing_database_verifiable(env, monkeypatch):
         exp_id = upload(s, conn, PNG, "a.png")
         form = {"vendor": "V", "amount": "10,00", "expense_date": "2026-01-02", "status": "paid",
                 "category": "Hosting", "payment_method": "bank"}
-        values = expenses.parse_expense_form(form)
-        values.pop("reverse_charge")
+        columns = {r[1] for r in conn.execute("PRAGMA table_info(expenses)")}
+        values = {k: v for k, v in expenses.parse_expense_form(form).items() if k in columns}
         expenses.update_expense(conn, exp_id, values)
     db.init_db(conn)
     assert db.schema_version(conn) >= number

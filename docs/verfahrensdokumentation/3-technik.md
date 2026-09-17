@@ -69,6 +69,7 @@ Alle Zeitstempel (`created_at`, `updated_at`, `at`) sind UTC im Format ISO 8601
 | `doc_type` | `pdf`, `jpg`, `png`, `xml` | nein |
 | `original_filename` | Dateiname beim Hochladen | nein |
 | `doc_text` | Textebene der PDF bzw. lesbare Fassung der E-Rechnung, für die Suche | nein |
+| `treatment` | `asset` = Anlagegut, wird abgeschrieben und zählt nicht zu den sofort abziehbaren Ausgaben; leer = gewöhnliche Ausgabe (auch alle Belege vor Einführung des Feldes) | ja, protokolliert |
 | `reverse_charge` | `13b` = Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG), leer = nein bzw. nicht markiert (auch alle Belege vor Einführung des Feldes) | ja, protokolliert |
 | `suggestion_json` | beim Hochladen gelesene Werte und deren Quelle (`xml`, `zugferd`, `text`, `none`); ggf. `reverse_charge_hint` mit dem Grund für einen § 13b-Hinweis (2.5) | nein |
 | `retain_until` | Frühestes Ende der Aufbewahrung (31.12. des Upload-Jahres + eingestellte Jahre), Mindestfrist (3.6) | nein |
@@ -204,3 +205,4 @@ ausgeführter Migrationen. Migrationen ändern nur Struktur oder Format, nie Inh
 | 3 | `expenses` neu aufgebaut, damit `doc_type` = `xml` zulässig ist (alle Zeilen, ids, Indizes und Trigger unverändert übernommen) |
 | 4 | Spalte `payment_method` in `invoices` und `expenses` |
 | 5 | Spalte `reverse_charge` in `expenses` (Vorgabe leer, Hashes bleiben gültig) |
+| 6 | Spalte `treatment` in `expenses` (Vorgabe leer, Hashes bleiben gültig) |

@@ -262,6 +262,15 @@ MIGRATIONS: list[tuple[str, str | Callable[[sqlite3.Connection], None]]] = [
             CHECK (reverse_charge IN ('', '13b'));
         """,
     ),
+    (
+        "treatment on expenses",
+        # Assets above the GWG limit are depreciated, not deducted at once (§ 4 Abs. 3 Satz 3 and 5,
+        # § 6 Abs. 2 EStG). '' = ordinary expense. Empty default keeps record hashes valid.
+        """
+        ALTER TABLE expenses ADD COLUMN treatment TEXT NOT NULL DEFAULT ''
+            CHECK (treatment IN ('', 'asset'));
+        """,
+    ),
 ]
 
 

@@ -22,6 +22,10 @@
       <option value="">Alle Belege</option>
       <option value="1" {{ 'selected' if rc }}>Nur § 13b UStG</option>
     </select>
+    <select name="asset" aria-label="Anlagegüter">
+      <option value="">Alle Arten</option>
+      <option value="1" {{ 'selected' if asset }}>Nur Anlagegüter</option>
+    </select>
     <input type="search" name="q" value="{{ q }}" placeholder="Lieferant, Nummer, Text" aria-label="Suche">
     <button class="btn" type="submit">Filtern</button>
   </form>
@@ -81,6 +85,7 @@
       <td class="num">{{ r.amount_cents|eur if r.amount_cents else '–' }}</td>
       <td>
         <span class="badge badge-{{ r.status }}">{{ expense_status_labels[r.status] }}</span>
+        {% if r.treatment == 'asset' %}<span class="badge badge-open" title="Anlagegut, wird abgeschrieben">Anlagegut</span>{% endif %}
         {% if r.reverse_charge == '13b' %}<span class="badge badge-open" title="Steuerschuldnerschaft des Leistungsempfängers">§ 13b</span>{% endif %}
         {% if r.id in late %}<span class="badge badge-late">über {{ review_days }} Tage ungeprüft</span>
         {% elif not r.reviewed and r.status != 'void' %}<span class="badge badge-overdue">Zu prüfen</span>{% endif %}

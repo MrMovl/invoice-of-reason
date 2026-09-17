@@ -61,6 +61,11 @@
           {% for key, label in payment_labels.items() %}<option value="{{ key }}" {{ 'selected' if key == form.payment_method }}>{{ label }}</option>{% endfor %}
         </select>
       </label>
+      <label class="check"><input type="checkbox" name="treatment" value="asset" {{ 'checked' if form.treatment == 'asset' }}> Anlagegut, wird abgeschrieben (AfA)</label>
+      {% if asset_hint %}
+      <p class="flash flash-warn">Betrag über {{ gwg_limit|eur }}: Ist das ein abnutzbares Wirtschaftsgut mit einem Nettopreis über {{ gwg_limit|eur }} (GWG-Grenze, § 6 Abs. 2 EStG), wird es nicht sofort abgezogen, sondern abgeschrieben und ins Anlagenverzeichnis aufgenommen (§ 4 Abs. 3 Satz 5 EStG). Maßgeblich ist der Nettopreis, auch ohne Vorsteuerabzug. Nur ein Hinweis, Speichern ist trotzdem möglich.</p>
+      {% endif %}
+      <p class="hint">Anlagegüter zählen nicht zu den Ausgaben der Übersicht. Anlagenverzeichnis und AfA werden außerhalb des Programms geführt.</p>
       <label class="check"><input type="checkbox" name="reverse_charge" value="13b" {{ 'checked' if form.reverse_charge == '13b' }}> Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG)</label>
       {% if suggestion.reverse_charge_hint and form.reverse_charge != '13b' %}
       <p class="flash flash-warn">Möglicherweise § 13b UStG: {{ suggestion.reverse_charge_hint }}. Bitte prüfen; die Umsatzsteuer schuldet dann auch ein Kleinunternehmer (§ 13b Abs. 5 UStG).</p>

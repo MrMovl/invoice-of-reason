@@ -15,7 +15,8 @@ erfüllt folgende Funktionen:
 - **Archiv:** Unveränderbare Aufbewahrung aller Rechnungen und Belege mit Prüfsummen und
   lückenloser Änderungshistorie.
 - **Übersicht:** Einnahmen und Ausgaben je Jahr nach Zahlungsdatum (Zufluss-/Abflussprinzip) als
-  Grundlage der Einnahmen-Überschuss-Rechnung.
+  Grundlage der Einnahmen-Überschuss-Rechnung. Als Anlagegut markierte Belege sind getrennt
+  ausgewiesen; die Übersicht zeigt den Überschuss vor Abschreibungen (AfA).
 
 Die Einnahmen-Überschuss-Rechnung selbst (Anlage EÜR) und die Steuererklärungen werden außerhalb
 des Programms erstellt (siehe Teil 6).

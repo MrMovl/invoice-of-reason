@@ -52,8 +52,16 @@ FIELD_LABELS = {
     "paid_date": "Bezahlt am",
     "payment_method": "Zahlungsart",
     "reverse_charge": "Steuerschuldnerschaft § 13b UStG",
+    "treatment": "Anlagegut (AfA)",
     "notes": "Notiz",
 }
+ASSET = "asset"
+# Geringwertige Wirtschaftsgüter: up to 800 € net they may be deducted at once (§ 6 Abs. 2 Satz 1
+# EStG, applied in the EÜR via § 4 Abs. 3 Satz 3 EStG); above that, depreciable assets are
+# depreciated and listed in an asset register (§ 4 Abs. 3 Satz 5 EStG). The limit is tested against
+# the net price even without input VAT deduction, but the tool only knows gross amounts: the review
+# hint uses the gross amount, which is never below the net price, so no case is missed.
+GWG_LIMIT_NET_CENTS = 80_000
 REVERSE_CHARGE = "13b"
 # § 13b Abs. 5 UStG: a Kleinunternehmer owes the VAT on these purchases (typically services from
 # suppliers abroad, § 13b Abs. 1 UStG) and has to declare it. Standard rate § 12 Abs. 1 UStG;
@@ -209,8 +217,24 @@ def parse_expense_form(form) -> dict:
         "paid_date": _iso(paid_date) if status == "paid" else None,
         "payment_method": _payment_method(status, payment_method),
         "reverse_charge": _reverse_charge(form.get("reverse_charge")),
+        "treatment": _treatment(form.get("treatment")),
         "notes": _clean_notes(form.get("notes")),
     }
+
+
+def _treatment(value: str | None) -> str:
+    if value in (None, ""):
+        return ""
+    if value != ASSET:
+        raise ArchiveError("Unbekannte Behandlung der Ausgabe.")
+    return value
+
+
+def asset_hint(values) -> bool:
+    """True when the amount may exceed the GWG limit and the expense is not marked as an asset.
+    Non-blocking: the net price and whether it is a depreciable asset at all need a person."""
+    return (values.get("status") != "void" and not values.get("treatment")
+            and (values.get("amount_cents") or 0) > GWG_LIMIT_NET_CENTS)
 
 
 def _reverse_charge(value: str | None) -> str:
@@ -261,7 +285,7 @@ def _show(field: str, value) -> str:
         return payment_label(value)
     if field == "status":
         return STATUS_NAMES.get(value, value)
-    if field == "reverse_charge":
+    if field in ("reverse_charge", "treatment"):
         return "ja"
     return str(value)
 
@@ -312,15 +336,19 @@ def cash_summary(conn: sqlite3.Connection, year: str = "") -> dict:
         + (" AND substr(paid_date, 1, 4) = ?" if year_ok else ""),
         (year,) if year_ok else (),
     ).fetchone()[0]
-    spent = conn.execute(
-        "SELECT COALESCE(SUM(amount_cents), 0) FROM expenses WHERE status = 'paid'"
+    spent, assets = conn.execute(
+        "SELECT COALESCE(SUM(CASE WHEN treatment = '' THEN amount_cents END), 0),"
+        " COALESCE(SUM(CASE WHEN treatment = ? THEN amount_cents END), 0)"
+        " FROM expenses WHERE status = 'paid'"
         + (f" AND substr({booking_date_sql()}, 1, 4) = ?" if year_ok else ""),
-        (year,) if year_ok else (),
-    ).fetchone()[0]
+        (ASSET, year) if year_ok else (ASSET,),
+    ).fetchone()
     to_review = conn.execute(
         "SELECT COUNT(*) FROM expenses WHERE reviewed = 0 AND status != 'void'").fetchone()[0]
-    return {"year": year if year_ok else "", "income": income, "expenses": spent,
-            "surplus": income - spent, "to_review": to_review,
+    # Assets are not deductible at once; their AfA is calculated outside the tool, so the surplus
+    # shown here is before AfA.
+    return {"year": year if year_ok else "", "income": income, "expenses": spent, "assets": assets,
+            "surplus_before_afa": income - spent, "to_review": to_review,
             "reverse_charge": reverse_charge_summary(conn, int(year) if year_ok else date.today().year)}
 
 

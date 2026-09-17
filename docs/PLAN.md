@@ -70,13 +70,17 @@ Reachable at `invoices.example.com` behind a login.
   Uploads unreviewed for more than 10 days are marked "über 10 Tage ungeprüft" (GoBD Rz. 47).
 - Saving requires a category, and for paid expenses a payment method (bank/card, cash, paid
   privately), unless the expense is voided (GoBD Rz. 50, 79).
+- Capital assets: `treatment` ('' | 'asset') is set by hand when reviewing. Assets are excluded from
+  the expense total of the overview and shown separately; the surplus is labelled "vor AfA". The
+  review form shows a non-blocking hint when the (gross) amount exceeds `GWG_LIMIT_NET_CENTS`
+  (800 € net, § 6 Abs. 2 EStG) and the field is empty. Asset register and AfA stay outside the tool.
 - Reverse charge (§ 13b UStG): `reverse_charge` ('' | '13b') is set by hand when reviewing. At upload
   `suggestion_json.reverse_charge_hint` records why it may apply (e-invoice VAT category AE, seller
   country ≠ DE, or wording such as "reverse charge" in the PDF text); it is shown, never applied.
   The expenses page sums marked, non-void expenses per quarter of the selected year by invoice
   date as the tax base, with 19 % as a labelled orientation value. Filter "Nur § 13b UStG".
-- Overview on the archive page: income (paid invoices) vs. expenses (paid expenses) by payment date,
-  per selected year, which matches the cash basis of an EÜR. An expense without a paid date counts
+- Overview on the archive page: income (paid invoices) vs. expenses (paid expenses except assets) by
+  payment date, per selected year, which matches the cash basis of an EÜR before AfA. An expense without a paid date counts
   on its invoice date.
 
 ## Archive rules
