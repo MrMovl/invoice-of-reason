@@ -1,4 +1,4 @@
-# Cancellation document: design proposal
+# Cancellation document (Stornorechnung)
 
 Status: **implemented** (docs/GOBD.md #9). This file describes the design as built; the sections
 below are kept for the reasoning. Decisions taken with it:
@@ -101,8 +101,8 @@ its record's state hash. Refund recording is a normal `status:paid` event on the
 `paid` **or** `cancelled`) minus refunds (`kind = 'cancellation'`, status `paid`, `paid_date` in the
 year). A cancellation never counts as income; a refund reduces income in the year it is paid out
 (Abflussprinzip), and the original receipt stays in its own year. Whether a refund is better shown
-as a separate line than as negative income is a presentation choice; proposal: separate
-"Erstattungen" line, surplus computed from both.
+as a separate line than as negative income is a presentation choice; built as a separate
+"Erstattungen" line, with the surplus computed from both.
 
 **Turnover monitor.** Receipts as above (`turnover.RECEIPTS_SQL`). Whether refunds reduce the
 Gesamtumsatz of the refund year, or the receipt year, is open (docs/GOBD.md). Until clarified, the

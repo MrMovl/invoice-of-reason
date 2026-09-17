@@ -1,100 +1,78 @@
-# GoBD compliance plan
+# GoBD compliance
 
-Gap analysis of this tool against the GoBD (BMF-Schreiben vom 28.11.2019, BStBl I S. 1269, geändert
+State of this tool against the GoBD (BMF-Schreiben vom 28.11.2019, BStBl I S. 1269, geändert
 durch BMF-Schreiben vom 11.03.2024, BStBl I S. 374, und vom 14.07.2025, BStBl 2025 I S. 1502,
 anzuwenden ab 14.07.2025, Rz. 185). "Rz." refers to the Randziffern of the GoBD in that current
-version. This is an
-engineering reading of the text, not tax advice: have a Steuerberater look at the finished
-Verfahrensdokumentation once.
+version. This is an engineering reading of the text, not tax advice: have a Steuerberater look at
+the Verfahrensdokumentation and at the questions at the end.
 
-Context: Kleinunternehmer (§ 19 UStG), Einnahmen-Überschuss-Rechnung. Rz. 15 (2024 version): the
+Context: Kleinunternehmer (§ 19 UStG), Einnahmen-Überschuss-Rechnung. Rz. 15: the
 requirements are judged "auch mit Blick auf die Unternehmensgröße". Proportionality applies, the
 principles do not go away.
 
-## Already covered
+## Status
+
+Numbers are stable; they are referenced from PRs, code comments and the questions below.
+
+| # | Item | State |
+|---|---|---|
+| 1 | Verfahrensdokumentation | parts 1–5 in [verfahrensdokumentation/](verfahrensdokumentation/README.md); **open:** the private part 6 (template in the repo, content only on the server) |
+| 2 | Programmidentität | done: version in the image and in `system_events`, deploys only from `main` |
+| 3 | Complete change log | done: old → new values, reasons required, config changes logged |
+| 4 | Z3 export | done: CSV + `index.xml` + DTD, see [EXPORT.md](EXPORT.md); **open:** a test import into IDEA |
+| 5 | Control log, restore test | done: `control_runs`, `invoices restore-test` |
+| 6 | Off-site backup | **open:** needs a provider decision, see [BACKUP.md](BACKUP.md) |
+| 7 | Receive e-invoices | done: XRechnung XML and ZUGFeRD, kept unchanged |
+| 8 | Completeness and timeliness checks | done: number gaps, 10-day review, category, payment method |
+| 9 | Cancellation document | done: Stornorechnung, see [CANCELLATION.md](CANCELLATION.md) |
+| 10 | Hash chain, trigger check | done: all logs chained, record states sealed, triggers restored and logged |
+| 11 | Read-only auditor login (Z1) | **open, optional:** the Z3 export usually suffices at this size |
+| 12 | Lock a year after the EÜR is filed | **open, optional** |
+| 13 | Map categories to Anlage-EÜR lines (Rz. 97) | **open, optional** |
+| 14 | Persistent login log | **open, optional** |
+| 15 | Issue e-invoices (ZUGFeRD/Factur-X) | **open, optional:** Kleinunternehmer are exempt (§ 34a UStDV); needed once the business leaves § 19, together with VAT support. Needs a spike: PDF/A-3 from reportlab plus `factur-x` on armv7 |
+| 16 | § 19 note in the 2025 wording (§ 34a Nr. 5 UStDV) | done; invoices created earlier keep the old sentence |
+| 17 | GoBD as amended 14.07.2025, retention since BEG IV | done: documentation only, no code change needed |
+| 18 | Reverse charge on expenses (§ 13b UStG) | done: flag, hints, quarterly sums |
+| 19 | Capital assets out of the expense total | done: register and AfA stay outside the tool |
+| 20 | Turnover limit monitor (§ 19 UStG since 2025) | done: status block, warnings, blocking with logged override |
+| 21 | Hotfix: cancelling a paid invoice erased the receipt | done: refused, and older cases are reported |
+| 22 | External receipts for the § 19 limits | done: append-only table, counted by the monitor |
+| 23 | § 13b in foreign currency | done: hint pointing to the BMF average rate (§ 16 Abs. 6 UStG) |
+
+## What is open
+
+1. **Part 6 of the Verfahrensdokumentation (#1).** The business-specific part: business and
+   responsibilities, other systems and the flow of documents (bank, email, paper), the
+   Organisationsanweisung for scanning (Rz. 136), where the asset register and the records of
+   activities outside this tool are kept, the off-site backup target and its key, and the
+   organisational controls actually performed. Template:
+   [6-betrieb-vorlage.md](verfahrensdokumentation/6-betrieb-vorlage.md); the filled-in version
+   never belongs in this repository.
+2. **Off-site backup (#6).** Everything a copy needs is in `backups/` on the server; the options
+   are in [BACKUP.md](BACKUP.md). The decryption key has to stay available for the whole retention
+   period (Rz. 134), a restore test belongs in the control log once a year, and a location outside
+   the EU may need approval (§ 146 Abs. 2b AO).
+3. **Test import of the export (#4).** `index.xml` is validated against the official DTD in the
+   tests, but the ZIP has never been imported into the tax office's audit software (IDEA).
+4. **Optional items #11–#15** as listed in the table.
+5. **Questions for the Steuerberater** below.
+
+## How the requirements are met
+
+Short map from the GoBD to the implementation; details in the Verfahrensdokumentation.
 
 | Requirement | Rz. | Where |
 |---|---|---|
-| Unveränderbarkeit, no deletion | 58, 107–111 | SQLite triggers, append-only event tables |
-| Keep documents in the received format, no conversion | 119, 131 | write-once files, 0444, SHA-256 |
-| Stammdaten history (Beispiel 4) | 59, 111 | `payload_json` holds the sender snapshot; PDFs are never regenerated |
-| Unique index per document | 69, 122 | invoice number, expense id, hash |
-| Log receipt and processing | 117 | `uploaded` / `reviewed` events |
-| Drafts are not retention-relevant | 5 | the preview is never stored |
-| Access control | 103 | login, CSRF, Cloudflare |
-| Integrity check | 100 | `verify`, before every backup and on detail pages |
-
-## Gaps
-
-### P1: required
-
-1. **Verfahrensdokumentation** (Rz. 34, 102, 106, 151–155). Split in two:
-   - *Public, in this repo* (`docs/verfahrensdokumentation/`): technical system documentation
-     (data model, meaning of every field, status and event action, Rz. 149), user documentation,
-     operations documentation (deploy, backup, restore), IKS description, export format.
-   - *Private, not in this repo* (a private repo or `~/invoices/config/` on the server):
-     business-specific part: general description of the business, other systems (bank, email,
-     paper), Organisationsanweisung for scanning paper receipts (Rz. 136), where bank statements
-     and business emails are kept, off-site backup target and key storage, the IKS actually
-     performed. The public part links to it.
-   - Both versioned (git), both included in backups, kept as long as the data they explain.
-2. **Programmidentität** (Rz. 80, 153–154). The deployed git commit is baked into the image,
-   every version change is recorded in an append-only `system_events` table and shown in the UI.
-   Schema migrations are versioned and logged. Deploys from a dirty working tree are refused.
-3. **Complete change log** (Rz. 58, 108, 111).
-   - Invoice notes: log old and new text (today only "notes" is logged).
-   - Expense notes: log the text instead of "…".
-   - No truncation of change details.
-   - Status changes log `alt → neu` including the payment date.
-   - A reason is required (server-side) for cancelling an invoice and voiding an expense.
-   - Configuration changes (sender data, retention years) are logged as `config_changed`.
-4. **Datenüberlassung / Z3 export** (Rz. 128, 167, Anlage). SQLite is not one of the formats
-   IDEA reads. `invoices export --year` (and a UI button) writes a ZIP: one CSV per table
-   (header row, `;`, decimal comma, CRLF, `"` quoting, unfiltered), `index.xml` following the
-   Beschreibungsstandard, all documents, a README.
-5. **Persistent control log** (Rz. 88, 100). Append-only `control_runs` table for verify, backup,
-   restore test and export runs, shown on the backups page. `invoices restore-test` restores a
-   backup into a temporary directory, verifies it and records the result.
-6. **Off-site backup** (Rz. 103–104). Operations, see BACKUP.md. Decryption key must stay
-   available for the whole retention period (Rz. 134). Yearly restore test, recorded as a control
-   run.
-
-### P2: strongly recommended
-
-7. **E-invoices: receive** (Rz. 118, 119, 125, 127, 131 as amended 14.07.2025). Receiving B2B
-   e-invoices is mandatory since 1.1.2025. Accept XRechnung/UBL/CII XML uploads, store them
-   unchanged, read booking suggestions from the XML, show a readable view. ZUGFeRD/Factur-X PDFs
-   keep their embedded XML already (no conversion); read suggestions from it too. Reading ZUGFeRD
-   is groundwork for issuing it (#15).
-   Since 14.07.2025 keeping the structured part of an e-invoice is sufficient; the human-readable
-   part of a hybrid invoice (the PDF of a ZUGFeRD invoice) must only be kept if it holds additional
-   or different tax-relevant information (Rz. 119, 131). For structured data only a match in
-   content, not an image match, is required (Rz. 118). The tool keeps the whole received file,
-   which is more than required and covers the case where the PDF carries extra information.
-8. **Completeness and timeliness checks** (Rz. 40, 46–50, 79).
-   - Gap analysis of invoice numbers per year, warning for numbers outside `YYYY-NNN`.
-   - Warning for unreviewed expenses older than 10 days.
-   - Category required when reviewing (at least the business assignment, Rz. 50).
-   - Payment method (bank / cash / paid privately).
-9. **Storno reference** (Rz. 64). Optional Stornorechnung document referencing the original,
-   linked both ways. Check with a Steuerberater whether status plus mandatory reason suffices
-   for a Kleinunternehmer.
-10. **Tamper evidence beyond the file system** (Rz. 110). Hash chain over all event tables,
-    checked by `verify`; chain head recorded with every backup (anchored by the off-site copy);
-    startup check that all protective triggers exist.
-
-### P3: optional / later
-
-11. Read-only auditor login for Z1 (Rz. 165, 174). The Z3 export usually suffices at this size.
-12. Lock a year after the EÜR is filed.
-13. Map categories to Anlage-EÜR lines (Rz. 97).
-14. Persistent login log.
-15. **E-invoices: issue** ZUGFeRD/Factur-X (EN 16931, PDF/A-3 with embedded XML, VAT category
-    `E`, "Kleinunternehmer gemäß § 19 UStG"), validated before archiving. Not required:
-    Kleinunternehmer are exempt from the issuing obligation (§ 34a UStDV), which otherwise applies
-    from 2027 (> 800k turnover) or 2028. Useful because B2B customers increasingly expect it, and
-    required once the business leaves § 19 (together with VAT support). Needs a spike: PDF/A-3
-    from reportlab plus the `factur-x` library on the armv7 image.
+| Nachvollziehbarkeit, Belegfunktion | 30–35, 61–81 | unique numbers, document and booking data linked, history per record |
+| Vollständigkeit, Einzelaufzeichnung | 36–43 | number gap analysis, duplicate detection by hash, nothing deletable |
+| Zeitgerechtheit | 45–52 | 10-day review warning, recorded capture and booking dates |
+| Unveränderbarkeit | 58–60, 107–112 | triggers, write-once files, SHA-256, change log with old → new, hash chain over all logs |
+| IKS | 100–102 | automatic checks and the control log, see [5-iks.md](verfahrensdokumentation/5-iks.md) |
+| Datensicherheit | 103–106 | access control, daily verified backup, restore test (off-site still open) |
+| Aufbewahrung, Formate | 113–144 | received format kept unchanged, e-invoices whole, minimum retention per record, nothing deleted |
+| Verfahrensdokumentation | 151–155 | parts 1–5 public, part 6 private |
+| Datenzugriff Z1–Z3 | 158–178 | screen access, filtered analyses, ZIP export with `index.xml` and DTD |
 
 ## Retention
 
@@ -196,11 +174,9 @@ questions are kept privately outside this repository.
 - **Cancellation: same number sequence, title "Stornorechnung", document in `invoices`** with a
   negative amount and the refund tracked on it. (#9, CANCELLATION.md)
 
-## Order
+## History
 
-1. #3 logging fixes, #2 Programmidentität, #5 control log (shared schema foundation)
-2. #4 export, #7 receiving e-invoices, #8 checks (parallel)
-3. #10 hash chain
-4. #1 Verfahrensdokumentation (public part), written against the finished system
-5. #6 off-site backup (operations, needs a decision)
-6. #9 after asking a Steuerberater, #11–15 later
+1. First pass (#1–#10, #16 excluded): change log, Programmidentität, control log, export, receiving
+   e-invoices, checks, hash chain, Verfahrensdokumentation.
+2. Review against § 34a UStDV, § 19 UStG and the GoBD 2025 (#16–#20).
+3. Second review: hotfix #21, cancellation document #9, external receipts #22, currency hint #23.
