@@ -1,5 +1,6 @@
 """§ 13b UStG: marking purchases where the recipient owes the VAT, hints at upload, summary."""
 
+import json
 import re
 import shutil
 import zipfile
@@ -27,13 +28,25 @@ def store(env):
 
 
 def foreign(xml: bytes, country: str = "IE", category: str | None = "AE") -> bytes:
-    """Turn a German sample invoice into one from a seller abroad."""
+    """Turn a German sample invoice into one from a seller abroad. With category AE the invoice
+    charges no VAT, as a real reverse charge invoice does."""
     xml = xml.replace(b"<cbc:IdentificationCode>DE</cbc:IdentificationCode>",
                       f"<cbc:IdentificationCode>{country}</cbc:IdentificationCode>".encode(), 1)
     xml = xml.replace(b"<ram:CountryID>DE</ram:CountryID>", f"<ram:CountryID>{country}</ram:CountryID>".encode(), 1)
     if category:
         xml = xml.replace(b"<cbc:ID>S</cbc:ID>", f"<cbc:ID>{category}</cbc:ID>".encode())
         xml = xml.replace(b"<ram:CategoryCode>S</ram:CategoryCode>", f"<ram:CategoryCode>{category}</ram:CategoryCode>".encode())
+    if category == "AE":
+        xml = no_vat(xml)
+    return xml
+
+
+def no_vat(xml: bytes) -> bytes:
+    """Zero every tax amount and rate, as on an invoice without VAT."""
+    for tag in (b"cbc:TaxAmount", b"ram:CalculatedAmount", b"ram:TaxTotalAmount"):
+        xml = re.sub(rb"(<" + tag + rb"[^>]*>)[^<]*(</" + tag + rb">)", rb"\g<1>0.00\g<2>", xml)
+    for tag in (b"cbc:Percent", b"ram:RateApplicablePercent"):
+        xml = re.sub(rb"(<" + tag + rb"[^>]*>)[^<]*(</" + tag + rb">)", rb"\g<1>0\g<2>", xml)
     return xml
 
 
@@ -60,9 +73,19 @@ def test_einvoice_seller_country_and_vat_categories(fixture):
     assert "Steuerkategorie AE" in hint and "Ausland (IE)" in hint
 
 
-def test_foreign_seller_alone_is_a_hint(store):
-    xml = foreign((FIXTURES / "ubl-invoice.xml").read_bytes(), country="NL", category=None)
+def test_foreign_seller_without_vat_is_a_hint(store):
+    xml = no_vat(foreign((FIXTURES / "ubl-invoice.xml").read_bytes(), country="NL", category=None))
     assert expenses.reverse_charge_hint(einvoice.parse(xml), "") == "Rechnungssteller mit Sitz im Ausland (NL)"
+
+
+def test_foreign_seller_charging_vat_is_no_hint(store):
+    """A supplier abroad may charge German VAT through the OSS scheme (B2C treatment) and still
+    print conditional reverse charge boilerplate. That is not a § 13b case."""
+    xml = foreign((FIXTURES / "ubl-invoice.xml").read_bytes(), country="IE", category=None)
+    invoice = einvoice.parse(xml)
+    boilerplate = "Customer may be obliged to account for VAT on reverse charge basis"
+    assert expenses.charged_vat(invoice, boilerplate) == "19 %"
+    assert expenses.reverse_charge_hint(invoice, boilerplate) == ""
 
 
 @pytest.mark.parametrize("text,expected", [
@@ -199,3 +222,61 @@ def test_foreign_currency_hint_for_reverse_charge(logged_in, app):
     page = logged_in.get(f"/expenses/{hinted}").get_data(as_text=True)
     assert "§ 16 Abs. 6 UStG" in page and "Durchschnittskurs" in page
     assert "§ 16 Abs. 6 UStG" not in logged_in.get(f"/expenses/{euro}").get_data(as_text=True)
+
+
+@pytest.mark.parametrize("line,expected", [
+    ("VAT - Germany (19% on €18.00) €3.42", "19 %"),
+    ("Umsatzsteuer 19 % | 1,90 €", "19 %"),
+    ("MwSt. 7 %   0,70", "7 %"),
+    ("Tax 19% 3.42", "19 %"),
+    ("VAT 0% 0.00", ""),                                   # no VAT charged
+    ("VAT 19% €0.00", ""),                                 # rate printed, nothing charged
+    ("Reverse charge: customer may be obliged to account for VAT", ""),
+    ("Umsatzsteuer-Identifikationsnummer: DE123456789", ""),  # not a VAT line
+    ("Summe netto 18,00", ""),
+])
+def test_charged_vat_from_pdf_text(line, expected):
+    assert expenses.charged_vat(None, line) == expected
+
+
+@needs_pdftotext
+def test_boilerplate_with_charged_vat_gives_no_hint_but_a_note(store, logged_in, app):
+    s = app.config["SETTINGS"]
+    conn = db.connect(s.db_path)
+    charged = upload(s, conn, make_pdf([
+        "Anthropic Ireland, Limited", "Rechnung R-1", "Claude Pro | 18,00 €",
+        "VAT - Germany (19% on €18.00) | €3.42", "Total | €21.42",
+        "Customer may be obliged to account for VAT on reverse charge basis"]), "ie-vat.pdf")
+    plain = upload(s, conn, make_pdf([
+        "Cloud Ltd, Dublin", "Rechnung R-2", "Service | 100,00 €",
+        "VAT 0% | 0,00 €", "Reverse charge applies"]), "ie-rc.pdf")
+    rows = {r["id"]: json.loads(r["suggestion_json"])
+            for r in conn.execute("SELECT id, suggestion_json FROM expenses")}
+    conn.close()
+
+    assert rows[charged]["vat_charged"] == "19 %" and "reverse_charge_hint" not in rows[charged]
+    assert rows[plain].get("vat_charged") in (None, "") and "Reverse charge" in rows[plain]["reverse_charge_hint"]
+
+    page = logged_in.get(f"/expenses/{charged}").get_data(as_text=True)
+    assert "Beleg weist Umsatzsteuer aus (19 %)" in page and "Möglicherweise § 13b" not in page
+    assert "Möglicherweise § 13b" in logged_in.get(f"/expenses/{plain}").get_data(as_text=True)
+
+
+@needs_pdftotext
+def test_domestic_invoice_with_vat_says_nothing(store, logged_in, app):
+    s = app.config["SETTINGS"]
+    conn = db.connect(s.db_path)
+    exp_id = upload(s, conn, make_pdf(["Bäckerei Kranz GmbH", "Rechnung 7", "Brot | 10,00 €",
+                                       "Umsatzsteuer 7 % | 0,70 €", "Gesamtbetrag | 10,70 €"]), "b.pdf")
+    conn.close()
+    page = logged_in.get(f"/expenses/{exp_id}").get_data(as_text=True)
+    assert "Möglicherweise § 13b" not in page and "Beleg weist Umsatzsteuer aus (7 %)" in page
+
+
+def test_xml_with_category_ae_still_hints(store):
+    s, conn = store
+    exp_id = upload(s, conn, foreign((FIXTURES / "cii-invoice.xml").read_bytes()), "ae.xml")
+    suggestion = json.loads(conn.execute("SELECT suggestion_json FROM expenses WHERE id = ?",
+                                         (exp_id,)).fetchone()[0])
+    assert "Steuerkategorie AE" in suggestion["reverse_charge_hint"]
+    assert suggestion.get("vat_charged") in (None, "")

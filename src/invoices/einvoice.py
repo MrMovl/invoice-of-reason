@@ -85,6 +85,7 @@ class EInvoice:
     payable: Decimal | None = None
     seller_country: str = ""         # ISO 3166-1 alpha-2 of the seller's postal address
     vat_categories: tuple[str, ...] = ()  # UNCL 5305 codes used in the document, e.g. S, AE
+    vat_rates: tuple[Decimal, ...] = ()   # percentages stated in the document
 
     @property
     def amount(self) -> Decimal | None:
@@ -213,7 +214,14 @@ def _ubl(root) -> EInvoice:
                                    "cac:Country/cbc:IdentificationCode").upper(),
         vat_categories=_codes(root.findall(".//cac:TaxCategory/cbc:ID", NS)
                               + root.findall(".//cac:ClassifiedTaxCategory/cbc:ID", NS)),
+        vat_rates=_rates(root.findall(".//cac:TaxCategory/cbc:Percent", NS)
+                         + root.findall(".//cac:ClassifiedTaxCategory/cbc:Percent", NS)),
     )
+
+
+def _rates(elements) -> tuple[Decimal, ...]:
+    values = {_decimal((el.text or "").strip()) for el in elements}
+    return tuple(sorted(v for v in values if v is not None))
 
 
 def _codes(elements) -> tuple[str, ...]:
@@ -274,6 +282,7 @@ def _cii(root) -> EInvoice:
         payable=_decimal(_text(sums, "ram:DuePayableAmount")),
         seller_country=_text(agreement, "ram:SellerTradeParty/ram:PostalTradeAddress/ram:CountryID").upper(),
         vat_categories=_codes(trade.findall(".//ram:ApplicableTradeTax/ram:CategoryCode", NS)),
+        vat_rates=_rates(trade.findall(".//ram:ApplicableTradeTax/ram:RateApplicablePercent", NS)),
     )
 
 

@@ -74,6 +74,11 @@ REVERSE_CHARGE_TEXT = re.compile(
     r"|art(?:icle|\.|ikel)?\s*196\b",
     re.IGNORECASE,
 )
+# A line that states VAT, e.g. "VAT - Germany (19% on €18.00) €3.42", "Umsatzsteuer 19 % 1,90 €",
+# "MwSt. 7 % 0,70". The identification number is not a VAT line.
+VAT_LINE = re.compile(r"\b(?:ust|u\.?\s?st|mwst|umsatzsteuer|vat|tax|sales\s+tax)\b(?!\s*-?\s*id)", re.IGNORECASE)
+PERCENT = re.compile(r"(\d{1,2}(?:[.,]\d{1,2})?)\s*%")
+MONEY = re.compile(r"(?<![\d.,])(\d{1,3}(?:[.\u00a0']\d{3})*|\d+)(?:[.,](\d{2}))?(?![\d.,%])")
 
 
 class DuplicateError(ArchiveError):
@@ -133,6 +138,9 @@ def store_upload(
         suggestion = extract.suggest(text)
         source = "text" if text_layer else "none"
         extra = {}
+    vat = charged_vat(invoice, text)
+    if vat:
+        extra["vat_charged"] = vat
     hint = reverse_charge_hint(invoice, text)
     if hint:
         extra["reverse_charge_hint"] = hint
@@ -180,9 +188,36 @@ def store_upload(
     return expense_id
 
 
+def charged_vat(invoice: einvoice.EInvoice | None, text: str) -> str:
+    """The VAT rate the document charges ("19 %"), or '' if it charges none.
+
+    A supplier abroad may treat the sale as B2C and charge German VAT through the OSS scheme while
+    still printing conditional boilerplate about reverse charge. Charged VAT settles it: then it is
+    not a § 13b case, whatever the footer says."""
+    if invoice:
+        positive = [rate for rate in invoice.vat_rates if rate > 0]
+        if invoice.tax_total and invoice.tax_total > 0 or ("S" in invoice.vat_categories and positive):
+            return f"{_rate_text(max(positive))} %" if positive else "ausgewiesen"
+    for line in (text or "").splitlines():
+        if not VAT_LINE.search(line):
+            continue
+        rates = [Decimal(m.group(1).replace(",", ".")) for m in PERCENT.finditer(line)]
+        amounts = [Decimal(f"{m.group(1).replace('.', '').replace(chr(160), '').replace(chr(39), '')}"
+                           f".{m.group(2) or '00'}") for m in MONEY.finditer(PERCENT.sub(" ", line))]
+        if any(rate > 0 for rate in rates) and any(amount > 0 for amount in amounts):
+            return f"{_rate_text(max(rates))} %"
+    return ""
+
+
+def _rate_text(rate: Decimal) -> str:
+    return f"{rate.normalize():f}".replace(".", ",")
+
+
 def reverse_charge_hint(invoice: einvoice.EInvoice | None, text: str) -> str:
     """Why an upload may fall under § 13b UStG, or ''. A hint for the review only: the field is
-    never set without a person deciding (a foreign seller may also charge German VAT)."""
+    never set without a person deciding. Documents that charge VAT get no hint at all."""
+    if charged_vat(invoice, text):
+        return ""
     reasons = []
     if invoice and "AE" in invoice.vat_categories:
         reasons.append("E-Rechnung mit Steuerkategorie AE (Steuerschuldnerschaft des Leistungsempfängers)")
