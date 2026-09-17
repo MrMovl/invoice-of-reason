@@ -45,6 +45,7 @@ def create_app(overrides: dict | None = None) -> Flask:
     conn.close()
     settings.archive_dir.mkdir(parents=True, exist_ok=True)
     settings.expenses_dir.mkdir(parents=True, exist_ok=True)
+    settings.docs_dir.mkdir(parents=True, exist_ok=True)
 
     @app.teardown_appcontext
     def close_db(_exc):

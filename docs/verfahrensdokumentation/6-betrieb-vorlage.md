@@ -1,9 +1,10 @@
 # 6. Betriebsspezifischer Teil – Vorlage
 
 **Diese Datei ist eine Vorlage.** Der ausgefüllte Teil 6 enthält Angaben zum Unternehmen und wird
-**nicht** in diesem öffentlichen Repository geführt, sondern z. B. in einem privaten Repository
-oder als versionierte Datei im Konfigurationsverzeichnis des Servers (dann in jede Sicherung
-aufnehmen). Jede Fassung mit Datum versehen; alte Fassungen nicht überschreiben.
+**nicht** in diesem öffentlichen Repository geführt. Empfohlener Ort: `data/dokumentation/` auf dem
+Server, als datierte Datei (z. B. `teil6-2026-09-17.md`); dieser Ordner liegt in jeder
+Datensicherung. Alternativ ein privates Repository. Jede Fassung mit Datum versehen, alte Fassungen
+nicht überschreiben und die Änderungshistorie (6.6) pflegen.
 
 ## 6.1 Unternehmen
 

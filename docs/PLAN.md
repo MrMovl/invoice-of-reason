@@ -165,7 +165,8 @@ Done:
   archived from their original PDF with the `invoices import-invoice` CLI (source "imported"): no
   web route, reason required, number and amount cross-checked with the PDF text, typed
   confirmation, same write-once rules and hash chain as created invoices.
-- Backups: automatic daily, manual button, download, rotation, verify, restore CLI.
+- Backups: automatic daily, manual button, download, rotation, verify, restore CLI. They include
+  `data/dokumentation/`, where part 6 of the Verfahrensdokumentation and similar documents live.
 - Expenses: upload, text-layer and e-invoice (XRechnung, ZUGFeRD) suggestions, review queue,
   categories, payment method, § 13b and asset marking, search in document text, income/expense
   summary. Included in verify and backups.

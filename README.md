@@ -61,7 +61,9 @@ export INVOICES_INSECURE_COOKIES=1                 # plain http on localhost onl
 .venv/bin/flask --app 'invoices:create_app()' run --debug
 ```
 
-Data goes to `./data`, backups to `./backups` (both gitignored).
+Data goes to `./data`, backups to `./backups` (both gitignored). `./data/dokumentation` is for
+documents that belong to the records but are not created by the program (part 6 of the
+Verfahrensdokumentation); every backup includes it.
 
 ## Deployment (Raspberry Pi)
 
