@@ -94,7 +94,9 @@ def test_cash_summary_by_payment_date(store):
     expenses.update_expense(conn, b, expenses.parse_expense_form({**base, "amount": "30", "status": "paid", "paid_date": "2027-01-02"}))
     expenses.update_expense(conn, c, expenses.parse_expense_form({**base, "amount": "999", "status": "open"}))
 
-    assert expenses.cash_summary(conn, "2026") == {"year": "2026", "income": 0, "expenses": 10000, "surplus": -10000, "to_review": 0}
+    summary = expenses.cash_summary(conn, "2026")
+    summary.pop("reverse_charge")
+    assert summary == {"year": "2026", "income": 0, "expenses": 10000, "surplus": -10000, "to_review": 0}
     assert expenses.cash_summary(conn, "2027")["surplus"] == 70000 - 3000
     assert expenses.cash_summary(conn, "x' OR 1=1")["year"] == ""
 

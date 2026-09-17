@@ -253,6 +253,15 @@ MIGRATIONS: list[tuple[str, str | Callable[[sqlite3.Connection], None]]] = [
             CHECK (payment_method IN ('', 'bank', 'cash', 'private'));
         """,
     ),
+    (
+        "reverse_charge on expenses",
+        # § 13b UStG: the recipient owes the VAT, also as Kleinunternehmer (§ 13b Abs. 5 UStG).
+        # '' = not marked. Empty default keeps existing record hashes valid.
+        """
+        ALTER TABLE expenses ADD COLUMN reverse_charge TEXT NOT NULL DEFAULT ''
+            CHECK (reverse_charge IN ('', '13b'));
+        """,
+    ),
 ]
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import date
 from functools import lru_cache
 from decimal import Decimal
@@ -388,9 +389,13 @@ def expense_list():
     status = request.args.get("status", "")
     category = request.args.get("category", "")
     review = request.args.get("review", "")
+    rc = request.args.get("rc", "")
     q = request.args.get("q", "").strip()
 
     where, params = [], []
+    if rc:
+        where.append("reverse_charge = ?")
+        params.append(expenses.REVERSE_CHARGE)
     if year:
         where.append(f"substr({booked}, 1, 4) = ?")
         params.append(year)
@@ -420,7 +425,9 @@ def expense_list():
     late = {r["id"] for r in rows if expenses.review_overdue(r)}
     return render_template("expenses.html", rows=rows, years=years, year=year, status=status,
                            category=category, categories=_categories(conn), review=review,
-                           q=q, totals=totals, late=late, review_days=expenses.REVIEW_DAYS)
+                           q=q, totals=totals, late=late, review_days=expenses.REVIEW_DAYS, rc=rc,
+                           rc_summary=expenses.reverse_charge_summary(
+                               conn, int(year) if re.fullmatch(r"\d{4}", year) else date.today().year))
 
 
 def _categories(conn) -> list[str]:

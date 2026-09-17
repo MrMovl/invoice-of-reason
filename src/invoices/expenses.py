@@ -51,8 +51,21 @@ FIELD_LABELS = {
     "status": "Status",
     "paid_date": "Bezahlt am",
     "payment_method": "Zahlungsart",
+    "reverse_charge": "Steuerschuldnerschaft § 13b UStG",
     "notes": "Notiz",
 }
+REVERSE_CHARGE = "13b"
+# § 13b Abs. 5 UStG: a Kleinunternehmer owes the VAT on these purchases (typically services from
+# suppliers abroad, § 13b Abs. 1 UStG) and has to declare it. Standard rate § 12 Abs. 1 UStG;
+# shown as an orientation value only, the correct rate depends on the supply.
+REVERSE_CHARGE_ORIENTATION_RATE = Decimal("0.19")
+# Wording on PDF invoices that points to reverse charge. Only a hint for the review, never set
+# automatically.
+REVERSE_CHARGE_TEXT = re.compile(
+    r"reverse[\s-]*charge|steuerschuldnerschaft\s+des\s+leistungsempf|umkehr(?:ung)?\s+der\s+steuerschuld"
+    r"|art(?:icle|\.|ikel)?\s*196\b",
+    re.IGNORECASE,
+)
 
 
 class DuplicateError(ArchiveError):
@@ -112,6 +125,9 @@ def store_upload(
         suggestion = extract.suggest(text)
         source = "text" if text_layer else "none"
         extra = {}
+    hint = reverse_charge_hint(invoice, text)
+    if hint:
+        extra["reverse_charge_hint"] = hint
     in_euro = extra.get("currency") in (None, "", "EUR")  # other currencies are not prefilled
     stem = slugify(original_filename.rsplit(".", 1)[0], fallback="Beleg")
     rel_path = f"{today.year}/{today:%Y%m%d}_{stem}_{sha[:8]}.{doc_type}"
@@ -156,6 +172,20 @@ def store_upload(
     return expense_id
 
 
+def reverse_charge_hint(invoice: einvoice.EInvoice | None, text: str) -> str:
+    """Why an upload may fall under § 13b UStG, or ''. A hint for the review only: the field is
+    never set without a person deciding (a foreign seller may also charge German VAT)."""
+    reasons = []
+    if invoice and "AE" in invoice.vat_categories:
+        reasons.append("E-Rechnung mit Steuerkategorie AE (Steuerschuldnerschaft des Leistungsempfängers)")
+    if invoice and invoice.seller_country and invoice.seller_country != "DE":
+        reasons.append(f"Rechnungssteller mit Sitz im Ausland ({invoice.seller_country})")
+    match = REVERSE_CHARGE_TEXT.search(text or "")
+    if match:
+        reasons.append(f"Belegtext enthält „{' '.join(match.group(0).split())}“")
+    return "; ".join(reasons)
+
+
 def parse_expense_form(form) -> dict:
     """Validate the review form. A voided expense (wrong upload) needs no booking data.
     The category is the minimum business assignment (GoBD Rz. 50); a paid expense needs its
@@ -178,8 +208,17 @@ def parse_expense_form(form) -> dict:
         "status": status,
         "paid_date": _iso(paid_date) if status == "paid" else None,
         "payment_method": _payment_method(status, payment_method),
+        "reverse_charge": _reverse_charge(form.get("reverse_charge")),
         "notes": _clean_notes(form.get("notes")),
     }
+
+
+def _reverse_charge(value: str | None) -> str:
+    if value in (None, ""):
+        return ""
+    if value != REVERSE_CHARGE:
+        raise ArchiveError("Unbekannter Wert für die Steuerschuldnerschaft.")
+    return value
 
 
 def _payment_method(status: str, method: str) -> str:
@@ -222,6 +261,8 @@ def _show(field: str, value) -> str:
         return payment_label(value)
     if field == "status":
         return STATUS_NAMES.get(value, value)
+    if field == "reverse_charge":
+        return "ja"
     return str(value)
 
 
@@ -279,4 +320,41 @@ def cash_summary(conn: sqlite3.Connection, year: str = "") -> dict:
     to_review = conn.execute(
         "SELECT COUNT(*) FROM expenses WHERE reviewed = 0 AND status != 'void'").fetchone()[0]
     return {"year": year if year_ok else "", "income": income, "expenses": spent,
-            "surplus": income - spent, "to_review": to_review}
+            "surplus": income - spent, "to_review": to_review,
+            "reverse_charge": reverse_charge_summary(conn, int(year) if year_ok else date.today().year)}
+
+
+def reverse_charge_date_sql() -> str:
+    """The date a § 13b purchase counts in: the invoice date, else payment, else upload. The tax
+    arises with the end of the period of the supply (§ 13b Abs. 1 and 2 UStG), which the tool does
+    not record; the invoice date is the closest available approximation."""
+    return "COALESCE(expense_date, paid_date, substr(created_at, 1, 10))"
+
+
+def reverse_charge_summary(conn: sqlite3.Connection, year: int) -> dict:
+    """Tax base of § 13b purchases per quarter of one year, plus 19 % as an orientation value.
+    Open and paid expenses count (the tax does not depend on payment), voided ones do not."""
+    day = reverse_charge_date_sql()
+    quarters = {q: 0 for q in (1, 2, 3, 4)}
+    count = 0
+    for month, cents in conn.execute(
+        f"SELECT CAST(substr({day}, 6, 2) AS INTEGER), amount_cents FROM expenses "
+        f"WHERE reverse_charge = ? AND status != 'void' AND substr({day}, 1, 4) = ?",
+        (REVERSE_CHARGE, f"{year:04d}"),
+    ):
+        quarters[(month - 1) // 3 + 1] += cents or 0
+        count += 1
+    base = sum(quarters.values())
+
+    def tax(cents: int) -> int:
+        return int((Decimal(cents) * REVERSE_CHARGE_ORIENTATION_RATE).quantize(Decimal("1"), "ROUND_HALF_UP"))
+
+    return {
+        "year": year,
+        "count": count,
+        "base": base,
+        "tax_orientation": tax(base),
+        "quarters": [{"quarter": q, "base": quarters[q], "tax_orientation": tax(quarters[q])}
+                     for q in (1, 2, 3, 4)],
+        "rate_percent": int(REVERSE_CHARGE_ORIENTATION_RATE * 100),
+    }

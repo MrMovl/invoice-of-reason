@@ -143,7 +143,7 @@ Programmidentität. Rules that follow:
 |---|---|---|
 | 16 | § 19 note in the 2025 wording (§ 34a Nr. 5 UStDV) | done (`fix/small-business-note`); invoices created before keep the old sentence |
 | 17 | Docs: GoBD second amendment (BMF 14.07.2025), retention since BEG IV | done (`gobd/legal-state-2025`); no code change needed |
-| 18 | Reverse charge flag on expenses (§ 13b UStG) | open |
+| 18 | Reverse charge flag on expenses (§ 13b UStG) | done (`gobd/reverse-charge`) |
 | 19 | Capital assets excluded from the expense total | open |
 | 20 | Turnover limit monitor (§ 19 UStG since 2025) | open |
 | 9 | Cancellation document | design proposal pending |
@@ -153,7 +153,12 @@ Programmidentität. Rules that follow:
 Open questions found while implementing; not decided in the code. Business-specific questions are
 kept privately outside this repository.
 
-_None yet from this review._
+1. **§ 13b reporting period.** Does the Finanzamt require Umsatzsteuer-Voranmeldungen for the § 13b
+   tax of a Kleinunternehmer, or only the annual return? The tool shows quarterly and annual sums
+   either way. (#18)
+2. **§ 13b timing.** The tax arises with the end of the period in which the service was performed.
+   The tool assigns a purchase to a quarter by its invoice date, as it does not record the service
+   period. Is that acceptable, or does the service period need its own field? (#18)
 
 ## Order
 

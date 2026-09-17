@@ -83,6 +83,8 @@ class EInvoice:
     tax_total: Decimal | None = None
     gross_total: Decimal | None = None
     payable: Decimal | None = None
+    seller_country: str = ""         # ISO 3166-1 alpha-2 of the seller's postal address
+    vat_categories: tuple[str, ...] = ()  # UNCL 5305 codes used in the document, e.g. S, AE
 
     @property
     def amount(self) -> Decimal | None:
@@ -207,7 +209,15 @@ def _ubl(root) -> EInvoice:
         tax_total=_decimal(_currency_amount(root.findall("cac:TaxTotal/cbc:TaxAmount", NS), currency)),
         gross_total=_decimal(_text(root, totals + "TaxInclusiveAmount")),
         payable=_decimal(_text(root, totals + "PayableAmount")),
+        seller_country=_text(root, "cac:AccountingSupplierParty/cac:Party/cac:PostalAddress/"
+                                   "cac:Country/cbc:IdentificationCode").upper(),
+        vat_categories=_codes(root.findall(".//cac:TaxCategory/cbc:ID", NS)
+                              + root.findall(".//cac:ClassifiedTaxCategory/cbc:ID", NS)),
     )
+
+
+def _codes(elements) -> tuple[str, ...]:
+    return tuple(sorted({(el.text or "").strip().upper() for el in elements} - {""}))
 
 
 def _currency_amount(elements, currency: str) -> str:
@@ -262,6 +272,8 @@ def _cii(root) -> EInvoice:
                            if sums is not None else ""),
         gross_total=_decimal(_text(sums, "ram:GrandTotalAmount")),
         payable=_decimal(_text(sums, "ram:DuePayableAmount")),
+        seller_country=_text(agreement, "ram:SellerTradeParty/ram:PostalTradeAddress/ram:CountryID").upper(),
+        vat_categories=_codes(trade.findall(".//ram:ApplicableTradeTax/ram:CategoryCode", NS)),
     )
 
 

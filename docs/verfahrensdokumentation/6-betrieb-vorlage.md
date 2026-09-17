@@ -33,6 +33,9 @@ aufnehmen). Jede Fassung mit Datum versehen; alte Fassungen nicht überschreiben
 - Bargeschäfte: kommen sie vor, wie werden sie erfasst
 - Erstellung der EÜR und Steuererklärungen (Programm, Steuerberater), wie die Summen aus diesem
   Programm übernommen werden, Zuordnung der Kategorien zu Zeilen der Anlage EÜR (Rz. 97)
+- Umsatzsteuer nach § 13b UStG auf Eingangsleistungen: in welchen Zeiträumen gemeldet wird
+  (Voranmeldung oder nur Jahreserklärung), wer die Meldung erstellt, wie die Summen aus dem
+  Programm übernommen werden
 - Sonstige Unterlagen (Verträge, Bescheide) und ihre Ablage
 
 ## 6.3 Organisationsanweisung Scannen/Fotografieren von Papierbelegen (Rz. 136–140)
