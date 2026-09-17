@@ -10,13 +10,15 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
 from . import db, extract
 from .archive import (
+    PAYMENT_METHODS,
     ArchiveError,
+    payment_label,
     quote,
     _clean,
     _write_once,
@@ -36,6 +38,7 @@ DOC_TYPES = {
     "png": (b"\x89PNG\r\n\x1a\n", "image/png"),
 }
 STATUSES = ("paid", "open", "void")
+REVIEW_DAYS = 10  # GoBD Rz. 47: unbare Geschäftsvorfälle within ten days
 FIELD_LABELS = {
     "vendor": "Lieferant",
     "invoice_number": "Rechnungsnummer",
@@ -44,6 +47,7 @@ FIELD_LABELS = {
     "category": "Kategorie",
     "status": "Status",
     "paid_date": "Bezahlt am",
+    "payment_method": "Zahlungsart",
     "notes": "Notiz",
 }
 
@@ -130,23 +134,45 @@ def store_upload(
 
 
 def parse_expense_form(form) -> dict:
-    """Validate the review form. A voided expense (wrong upload) needs no booking data."""
+    """Validate the review form. A voided expense (wrong upload) needs no booking data.
+    The category is the minimum business assignment (GoBD Rz. 50); a paid expense needs its
+    payment method (Rz. 79)."""
     status = form.get("status") or ""
     if status not in STATUSES:
         raise ArchiveError("Unbekannter Status.")
     required = status != "void"
     amount = (form.get("amount") or "").strip()
     paid_date = parse_date(form.get("paid_date"), "Zahlungsdatum", required=False)
+    payment_method = form.get("payment_method") or ""
+    if payment_method and payment_method not in PAYMENT_METHODS:
+        raise ArchiveError("Unbekannte Zahlungsart.")
     return {
         "vendor": _clean(form.get("vendor"), "Lieferant", 120, required=required),
         "invoice_number": _clean(form.get("invoice_number"), "Rechnungsnummer", 60, required=False),
         "expense_date": _iso(parse_date(form.get("expense_date"), "Rechnungsdatum", required=required)),
         "amount_cents": int(parse_amount(amount) * 100) if amount or required else None,
-        "category": _clean(form.get("category"), "Kategorie", 60, required=False),
+        "category": _clean(form.get("category"), "Kategorie", 60, required=required),
         "status": status,
         "paid_date": _iso(paid_date) if status == "paid" else None,
+        "payment_method": _payment_method(status, payment_method),
         "notes": _clean_notes(form.get("notes")),
     }
+
+
+def _payment_method(status: str, method: str) -> str:
+    if status != "paid":
+        return ""
+    if not method:
+        raise ArchiveError("Zahlungsart fehlt.")
+    return method
+
+
+def review_overdue(row, today: date | None = None) -> bool:
+    """True if an unreviewed expense was uploaded more than REVIEW_DAYS days ago (GoBD Rz. 47)."""
+    if row["reviewed"] or row["status"] == "void":
+        return False
+    today = today or date.today()
+    return date.fromisoformat(row["created_at"][:10]) < today - timedelta(days=REVIEW_DAYS)
 
 
 def _clean_notes(value: str | None) -> str:
@@ -169,6 +195,8 @@ def _show(field: str, value) -> str:
         return format_date(date.fromisoformat(value))
     if field == "notes":
         return quote(value)
+    if field == "payment_method":
+        return payment_label(value)
     return str(value)
 
 

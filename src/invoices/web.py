@@ -103,6 +103,7 @@ def inject_globals():
         "csrf_token": auth.csrf_token,
         "status_labels": STATUS_LABELS,
         "expense_status_labels": EXPENSE_STATUS_LABELS,
+        "payment_labels": archive.PAYMENT_METHODS,
         "current_user": session.get("user"),
         "app_version": system.app_version(),
     }
@@ -217,7 +218,8 @@ def invoice_list():
     }
     return render_template("list.html", rows=rows, years=years, year=year, status=status,
                            q=q, totals=totals, today=today,
-                           cash=expenses.cash_summary(conn, year))
+                           cash=expenses.cash_summary(conn, year),
+                           number_findings=archive.number_findings(conn))
 
 
 def _customers(conn):
@@ -331,7 +333,8 @@ def invoice_status(invoice_id: int):
         paid = None
         if status == "paid":
             paid = archive.parse_date(request.form.get("paid_date"), "Zahlungsdatum")
-        archive.set_status(get_db(), invoice_id, status, paid, request.form.get("note", ""))
+        archive.set_status(get_db(), invoice_id, status, paid, request.form.get("note", ""),
+                           request.form.get("payment_method", ""))
         flash(f"Status: {STATUS_LABELS[status]}.", "ok")
     except archive.ArchiveError as e:
         flash(str(e), "error")
@@ -393,9 +396,10 @@ def expense_list():
         "open": sum(r["amount_cents"] or 0 for r in rows if r["status"] == "open"),
         "to_review": sum(1 for r in rows if not r["reviewed"] and r["status"] != "void"),
     }
+    late = {r["id"] for r in rows if expenses.review_overdue(r)}
     return render_template("expenses.html", rows=rows, years=years, year=year, status=status,
                            category=category, categories=_categories(conn), review=review,
-                           q=q, totals=totals)
+                           q=q, totals=totals, late=late, review_days=expenses.REVIEW_DAYS)
 
 
 def _categories(conn) -> list[str]:
@@ -455,7 +459,8 @@ def expense_detail(expense_id: int, form=None):
     suggestion = json.loads(row["suggestion_json"])
     suggestion["amount_cents"] = int(Decimal(suggestion["amount"]) * 100) if suggestion["amount"] else None
     return render_template("expense.html", exp=row, form=form, events=events, problem=problem,
-                           suggestion=suggestion,
+                           suggestion=suggestion, review_late=expenses.review_overdue(row),
+                           review_days=expenses.REVIEW_DAYS,
                            categories=_categories(conn), next_review=next_review,
                            today=date.today().isoformat())
 

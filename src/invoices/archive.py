@@ -21,6 +21,7 @@ from . import db
 from .pdf import InvoiceData, Sender, format_date, render_invoice
 
 NUMBER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
+SCHEME_RE = re.compile(r"^(\d{4})-(\d{3,})$")
 MAX_AMOUNT = Decimal("10000000")
 
 
@@ -81,6 +82,75 @@ def next_number(conn: sqlite3.Connection, year: int) -> str:
     return f"{year}-{highest + 1:03d}"
 
 
+def number_problem(conn: sqlite3.Connection, number: str, issue_date: date) -> str | None:
+    """Why a new invoice number breaks the running sequence (GoBD Rz. 50), or None.
+
+    A number fits if it follows `YYYY-NNN`, its year is the issue year, and it leaves no gap
+    after the highest number issued so far. Filling an existing gap is allowed.
+    """
+    m = SCHEME_RE.match(number)
+    if not m:
+        return f"Rechnung {number} passt nicht zum Nummernschema JJJJ-NNN."
+    if int(m.group(1)) != issue_date.year:
+        return f"Rechnung {number} passt nicht zum Rechnungsdatum {format_date(issue_date)}."
+    expected = next_number(conn, int(m.group(1)))
+    if int(m.group(2)) > int(expected.split("-")[1]):
+        return f"Rechnung {number} lässt eine Lücke im Nummernkreis {m.group(1)} (nächste Nummer: {expected})."
+    return None
+
+
+def number_gaps(conn: sqlite3.Connection) -> dict[str, dict]:
+    """Gap analysis of the invoice numbers (GoBD Rz. 40 Lückenanalyse, Rz. 50).
+
+    Returns only years with findings, newest first:
+    {year: {"missing": [numbers], "irregular": [(number, problem)]}}.
+    Gaps are found per number year between 1 and the highest issued number; cancelled invoices
+    keep their number. Irregular numbers (outside `YYYY-NNN`, or a year other than the issue
+    year) are listed under their issue year. Duplicates cannot exist (UNIQUE).
+    """
+    found: dict[str, dict] = {}
+
+    def year(y: str) -> dict:
+        return found.setdefault(y, {"missing": [], "irregular": []})
+
+    used: dict[str, set[int]] = {}
+    for row in conn.execute("SELECT number, issue_date FROM invoices ORDER BY issue_date, number"):
+        issue_year = row["issue_date"][:4]
+        m = SCHEME_RE.match(row["number"])
+        if not m:
+            year(issue_year)["irregular"].append((row["number"], "passt nicht zum Nummernschema JJJJ-NNN"))
+            continue
+        used.setdefault(m.group(1), set()).add(int(m.group(2)))
+        if m.group(1) != issue_year:
+            year(issue_year)["irregular"].append(
+                (row["number"], f"passt nicht zum Rechnungsdatum {_de(row['issue_date'])}"))
+    for y, numbers in used.items():
+        missing = [f"{y}-{n:03d}" for n in range(1, max(numbers)) if n not in numbers]
+        if missing:
+            year(y)["missing"] = missing
+    return dict(sorted(found.items(), reverse=True))
+
+
+def number_findings(conn: sqlite3.Connection) -> list[str]:
+    """number_gaps as German messages, consecutive missing numbers joined into ranges."""
+    messages = []
+    for y, result in number_gaps(conn).items():
+        ranges: list[list[str]] = []
+        previous = None
+        for number in result["missing"]:
+            n = int(number.split("-")[1])
+            if previous is not None and n == previous + 1:
+                ranges[-1][1] = number
+            else:
+                ranges.append([number, number])
+            previous = n
+        if ranges:
+            gaps = ", ".join(a if a == b else f"{a} bis {b}" for a, b in ranges)
+            messages.append(f"Nummernkreis {y}: Lücke bei {gaps}")
+        messages += [f"Rechnung {number} {problem}" for number, problem in result["irregular"]]
+    return messages
+
+
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -132,6 +202,7 @@ class InvoiceInput:
     title: str
     description: str
     amount: Decimal
+    number_reason: str = ""  # why a number outside the running sequence is used on purpose
 
     def to_invoice_data(self) -> InvoiceData:
         service = format_date(self.service_from)
@@ -199,7 +270,14 @@ def parse_invoice_form(form) -> InvoiceInput:
         title=_clean(form.get("title"), "Leistungstitel", 200),
         description=_clean(form.get("description"), "Beschreibung", 1000, required=False),
         amount=parse_amount(form.get("amount") or ""),
+        number_reason=_number_reason(form),
     )
+
+
+def _number_reason(form) -> str:
+    if not form.get("number_override"):
+        return ""
+    return _clean(form.get("number_reason"), "Grund für die abweichende Nummer", 200)
 
 
 def issue_invoice(
@@ -211,6 +289,13 @@ def issue_invoice(
 ) -> int:
     """Render, archive and record a new invoice. Returns the invoice id."""
     number = validate_number(conn, inp.number)
+    detail = ""
+    problem = number_problem(conn, number, inp.issue_date)
+    if problem:
+        if not inp.number_reason:
+            raise ArchiveError(f"{problem} Um sie trotzdem zu verwenden, „Abweichende Nummer bewusst "
+                               "verwenden“ ankreuzen und einen Grund angeben.")
+        detail = f"Abweichende Nummer: {problem} Grund: {quote(inp.number_reason)}"
     data = inp.to_invoice_data()
     pdf = render_invoice(data, sender)
     rel_path = f"{data.issue_date.year}/{pdf_filename(number, data.customer_name)}"
@@ -238,10 +323,12 @@ def issue_invoice(
             "payload_json": json.dumps(payload, ensure_ascii=False, sort_keys=True),
             "retain_until": retain_until(data.issue_date, retention_years).isoformat(),
         },
+        detail=detail,
     )
 
 
-def _record(conn, archive_dir: Path, rel_path: str, pdf: bytes, source: str, row: dict) -> int:
+def _record(conn, archive_dir: Path, rel_path: str, pdf: bytes, source: str, row: dict,
+            detail: str = "") -> int:
     now = db.now_iso()
     row = {
         **row,
@@ -259,7 +346,7 @@ def _record(conn, archive_dir: Path, rel_path: str, pdf: bytes, source: str, row
         cur = conn.execute(f"INSERT INTO invoices ({cols}) VALUES ({marks})", tuple(row.values()))
         invoice_id = cur.lastrowid
         db.add_event(conn, invoice_id, "created" if source == "generated" else "imported",
-                     f"sha256={row['pdf_sha256']}")
+                     "; ".join(filter(None, [f"sha256={row['pdf_sha256']}", detail])))
         _write_once(archive_dir, rel_path, pdf)
         written = True
         conn.commit()
@@ -274,6 +361,12 @@ def _record(conn, archive_dir: Path, rel_path: str, pdf: bytes, source: str, row
 
 
 STATUS_NAMES = {"open": "Offen", "paid": "Bezahlt", "cancelled": "Storniert"}
+# GoBD Rz. 79. '' = unknown (recorded before the payment method existed).
+PAYMENT_METHODS = {"bank": "Überweisung/Karte", "cash": "Bar", "private": "Privat bezahlt (Einlage)"}
+
+
+def payment_label(method: str | None) -> str:
+    return PAYMENT_METHODS.get(method or "", "–")
 
 
 def quote(text: str) -> str:
@@ -281,27 +374,34 @@ def quote(text: str) -> str:
 
 
 def set_status(conn: sqlite3.Connection, invoice_id: int, status: str,
-               paid_date: date | None = None, note: str = "") -> None:
-    """Change the payment status. The event records old and new values (GoBD Rz. 58)."""
+               paid_date: date | None = None, note: str = "", payment_method: str = "") -> None:
+    """Change the payment status. The event records old and new values (GoBD Rz. 58).
+    Payment date and method belong to the payment: they are cleared when it is undone."""
     if status not in STATUS_NAMES:
         raise ArchiveError("Unbekannter Status.")
     if status == "paid" and paid_date is None:
         raise ArchiveError("Zahlungsdatum fehlt.")
+    if status == "paid" and payment_method not in PAYMENT_METHODS:
+        raise ArchiveError("Zahlungsart fehlt.")
     note = note.replace("\r\n", "\n").strip()
     if len(note) > 500:
         raise ArchiveError("Grund ist zu lang (max. 500 Zeichen).")
     if status == "cancelled" and not note:
         raise ArchiveError("Grund für die Stornierung fehlt.")
     new_paid = paid_date.isoformat() if status == "paid" else None
+    new_method = payment_method if status == "paid" else ""
     with conn:
-        row = conn.execute("SELECT status, paid_date FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+        row = conn.execute("SELECT status, paid_date, payment_method FROM invoices WHERE id = ?",
+                           (invoice_id,)).fetchone()
         if row is None:
             raise ArchiveError("Rechnung nicht gefunden.")
-        conn.execute("UPDATE invoices SET status = ?, paid_date = ?, updated_at = ? WHERE id = ?",
-                     (status, new_paid, db.now_iso(), invoice_id))
+        conn.execute("UPDATE invoices SET status = ?, paid_date = ?, payment_method = ?, updated_at = ? "
+                     "WHERE id = ?", (status, new_paid, new_method, db.now_iso(), invoice_id))
         changes = [f"Status: {STATUS_NAMES[row['status']]} → {STATUS_NAMES[status]}"]
         if row["paid_date"] != new_paid:
             changes.append(f"Bezahlt am: {_de(row['paid_date'])} → {_de(new_paid)}")
+        if row["payment_method"] != new_method:
+            changes.append(f"Zahlungsart: {payment_label(row['payment_method'])} → {payment_label(new_method)}")
         if note:
             changes.append(f"Grund: {quote(note)}")
         db.add_event(conn, invoice_id, f"status:{status}", "; ".join(changes))

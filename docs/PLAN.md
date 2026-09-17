@@ -29,7 +29,7 @@ Reachable at `invoices.example.com` behind a login.
 
 - `invoices`: one row per invoice. Identity fields (number, dates, customer, amount, PDF path and
   SHA-256, input snapshot incl. sender data) are protected by SQLite triggers: no UPDATE, no DELETE.
-  Only `status`, `paid_date`, `notes` can change.
+  Only `status`, `paid_date`, `payment_method`, `notes` can change.
 - `events`: append-only audit log (created, imported, status changes, notes).
 - `expenses`: one row per uploaded document (received invoice, receipt). The document itself
   (path, SHA-256, size, type, original filename, extracted text, original suggestion) is immutable
@@ -51,6 +51,9 @@ Reachable at `invoices.example.com` behind a login.
   (labelled totals like "Gesamtbetrag"/"Zahlbetrag" win, net/VAT lines are skipped, else the largest
   amount with a currency). Scans and photos get no suggestion. No OCR, nothing leaves the server.
 - Every upload stays "zu prüfen" until saved once; "Speichern und nächster" walks the review queue.
+  Uploads unreviewed for more than 10 days are marked "über 10 Tage ungeprüft" (GoBD Rz. 47).
+- Saving requires a category, and for paid expenses a payment method (bank/card, cash, paid
+  privately), unless the expense is voided (GoBD Rz. 50, 79).
 - Overview on the archive page: income (paid invoices) vs. expenses (paid expenses) by payment date,
   per selected year, which matches the cash basis of an EÜR. An expense without a paid date counts
   on its invoice date.
@@ -65,6 +68,11 @@ Reachable at `invoices.example.com` behind a login.
   Note: since 2025 the statutory period for Buchungsbelege such as outgoing invoices is 8 years
   (BEG IV); 10 years is the safer default you asked for. Nothing is deleted automatically.
 - Cancelled invoices stay in the archive with status "Storniert" and a reason.
+- Invoice numbers follow `YYYY-NNN` without gaps. The archive page lists gaps, numbers outside the
+  scheme and numbers whose year differs from the issue date (`archive.number_gaps`). Creating an
+  invoice that would add such a finding needs "Abweichende Nummer bewusst verwenden" plus a reason,
+  which is logged in the `created` event.
+- Marking an invoice paid requires the payment method; setting it back clears it (logged).
 
 ## GoBD
 

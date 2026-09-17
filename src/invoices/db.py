@@ -182,6 +182,17 @@ MIGRATIONS: list[tuple[str, str]] = [
         BEGIN SELECT RAISE(ABORT, 'control runs are append-only'); END;
         """,
     ),
+    (
+        "payment_method on invoices and expenses",
+        # GoBD Rz. 79 (Zahlungsart). '' = unknown, for rows recorded before this migration.
+        # Stays changeable: not part of the invoices_immutable trigger.
+        """
+        ALTER TABLE invoices ADD COLUMN payment_method TEXT NOT NULL DEFAULT ''
+            CHECK (payment_method IN ('', 'bank', 'cash', 'private'));
+        ALTER TABLE expenses ADD COLUMN payment_method TEXT NOT NULL DEFAULT ''
+            CHECK (payment_method IN ('', 'bank', 'cash', 'private'));
+        """,
+    ),
 ]
 
 

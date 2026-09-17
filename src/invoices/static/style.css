@@ -114,6 +114,11 @@ form .row { display: flex; gap: .75rem; align-items: end; flex-wrap: wrap; margi
 form .row label { flex: 1 1 160px; }
 .stack { display: grid; gap: 14px; }
 details { margin: .6rem 0 1rem; }
+label.check { flex-direction: row; align-items: center; gap: 10px; }
+label.check input { width: auto; min-height: 0; margin: 0; }
+.number-override { margin: 0; }
+.number-override[open] { display: grid; gap: 14px; }
+form .row .hint { flex-basis: 100%; margin: 0; }
 summary { cursor: pointer; font: 400 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--soft); }
 summary:hover { color: var(--deep); }
 .filters { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
@@ -162,6 +167,7 @@ td.num { font-family: var(--mono); font-size: 14px; }
 .badge-paid { background: var(--ok-bg); color: var(--ok); }
 .badge-cancelled, .badge-void { background: rgba(26, 43, 53, .07); color: var(--soft); text-decoration: line-through; }
 .badge-overdue { background: var(--warn-bg); color: var(--warn); }
+.badge-late { background: var(--err-bg); color: var(--err); }
 
 /* Detail pages */
 .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; align-items: start; }

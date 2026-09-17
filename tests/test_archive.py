@@ -67,7 +67,7 @@ def test_db_rejects_tampering(store):
     with pytest.raises(sqlite3.DatabaseError, match="cannot be deleted"):
         conn.execute("DELETE FROM invoices WHERE id = ?", (inv_id,))
     conn.rollback()
-    archive.set_status(conn, inv_id, "paid", date(2026, 9, 20))
+    archive.set_status(conn, inv_id, "paid", date(2026, 9, 20), payment_method="bank")
     assert conn.execute("SELECT status, paid_date FROM invoices").fetchone()[:] == ("paid", "2026-09-20")
 
 
