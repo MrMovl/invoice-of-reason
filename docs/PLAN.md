@@ -116,8 +116,10 @@ Done in v0.1:
   "use as template", Leistungszeitraum, configurable Zahlungsziel.
 - Archive list with year/status/search filters, totals, overdue marker.
 - Detail page: download/view, mark paid/open/cancelled, notes, integrity status, history.
-- Invoices only enter the archive through the create form. The first invoice 2026-001, made
-  before the tool existed, was archived once from its original PDF (source "imported").
+- Invoices enter the archive through the create form. Invoices issued before the tool existed are
+  archived from their original PDF with the `invoices import-invoice` CLI (source "imported"): no
+  web route, reason required, number and amount cross-checked with the PDF text, typed
+  confirmation, same write-once rules and hash chain as created invoices.
 - Backups: automatic daily, manual button, download, rotation, verify, restore CLI.
 - Expenses: upload, text-layer and e-invoice (XRechnung, ZUGFeRD) suggestions, review queue, categories, search in document text,
   income/expense summary. Included in verify and backups.

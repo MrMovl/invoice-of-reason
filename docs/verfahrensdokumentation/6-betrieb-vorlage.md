@@ -12,6 +12,14 @@ aufnehmen). Jede Fassung mit Datum versehen; alte Fassungen nicht überschreiben
 - Kleinunternehmer nach § 19 UStG seit; Gewinnermittlung EÜR
 - Verantwortlich für Buchführung und Verfahren (Rz. 21); ggf. Steuerberater und dessen Aufgaben
 
+## 6.1a Inbetriebnahme und Neustart
+
+- Datum der Inbetriebnahme des Programms
+- Falls der Datenbestand vor der produktiven Nutzung neu begonnen wurde: Datum, Grund, was aus dem
+  alten Bestand übernommen wurde (importierte Rechnungen mit Nummer, erneut hochgeladene Belege),
+  wo die letzte Sicherung des alten Bestands aufbewahrt wird
+- Vor dem Programm erstellte Rechnungen, die importiert wurden (Nummer, Datum des Imports)
+
 ## 6.2 Eingesetzte Systeme und Belegfluss
 
 - Installation dieses Programms: Server (Gerät, Standort), Zugang (Domain, Cloudflare Access ja/nein),

@@ -368,7 +368,8 @@ Statuswerte
 invoices.status:  open = offen, paid = bezahlt, cancelled = storniert
 expenses.status:  paid = bezahlt, open = offen, void = verworfen (z. B. Fehl-Upload; Grund in notes
                   bzw. im Änderungsprotokoll)
-invoices.source:  generated = im Programm erstellt, imported = importierte Rechnung
+invoices.source:  generated = im Programm erstellt, imported = vor Einführung des Programms
+                  erstellte Rechnung, Original-PDF unverändert übernommen (Grund im Verlauf)
 
 Einträge in den Protokollen (action bzw. kind)
 ----------------------------------------------

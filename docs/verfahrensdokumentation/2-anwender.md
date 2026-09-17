@@ -87,7 +87,26 @@ Beleg bleibt archiviert und zählt nicht zu den Ausgaben.
   Kategorie, „zu prüfen“; Volltextsuche in Lieferant, Nummer, Kategorie, Notiz, Dateiname und
   Belegtext.
 
-## 2.9 Backups-Seite
+## 2.9 Import einer vor dem Programm erstellten Rechnung
+
+Nur für Rechnungen, die vor Einführung des Programms erstellt und versandt wurden. Kein Weg über
+die Weboberfläche; auf dem Server per Kommandozeile `invoices import-invoice` (Aufruf in
+`README.md`).
+
+1. Original-PDF, wie versandt, und alle Angaben der Rechnung (Nummer, Datum, Leistungsdatum,
+   Fälligkeit, Kunde, Leistung, Betrag) sowie ein Grund für den Import werden angegeben.
+2. Das Programm prüft die Angaben wie beim Erstellen, lehnt eine bereits vergebene Nummer, ein
+   Rechnungsdatum in der Zukunft und eine bereits archivierte Datei (als Rechnung oder Beleg) ab
+   und gleicht Rechnungsnummer und Betrag mit dem Text der PDF ab.
+3. Alle Angaben und etwaige Abweichungen werden angezeigt. Abweichungen müssen ausdrücklich
+   bestätigt werden (`--accept-warnings`); zum Import wird die Rechnungsnummer eingetippt.
+4. Die PDF wird unverändert archiviert (keine Neuerzeugung, keine Konvertierung), mit denselben
+   Regeln wie eine im Programm erstellte Rechnung (Teil 3.3). Herkunft `imported`; der
+   Verlaufseintrag enthält Grund, ursprünglichen Dateinamen, eine etwaige Abweichung vom
+   Nummernkreis und bestätigte Hinweise. Danach ist die Rechnung unveränderbar und kann wie jede
+   andere als bezahlt markiert oder storniert werden.
+
+## 2.10 Backups-Seite
 
 Zeigt das Ergebnis der Integritätsprüfung (Prüfsummen, Hash-Kette, Trigger), die vorhandenen
 Sicherungen, das Kontrollprotokoll und erzeugt den Datenexport für die Betriebsprüfung

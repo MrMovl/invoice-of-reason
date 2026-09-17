@@ -73,6 +73,20 @@ docker compose logs -f app
 docker compose exec app invoices verify         # check all archived invoices and expense documents
 docker compose run --rm app invoices backup     # extra backup now
 docker compose run --rm app invoices restore-test /backups/<file>   # restore into a temp dir, verify, log it
+```
+
+### Importing an invoice issued before the program
+
+Only for invoices that were created and sent before this tool existed (e.g. 2026-001). The PDF is
+archived byte-for-byte with the same write-once rules as created invoices; the command shows all
+values and any mismatch with the PDF text, and asks you to type the invoice number to confirm.
+
+```sh
+docker compose run --rm -v "$PWD/Rechnung_2026-001.pdf:/import/Rechnung_2026-001.pdf:ro" app \
+  invoices import-invoice /import/Rechnung_2026-001.pdf \
+  --number 2026-001 --issue-date 2026-09-02 --service-date 01.09.2026 --due-date 2026-09-16 \
+  --customer-name "…" --customer-street "…" --customer-city "…" \
+  --title "…" --amount 700,00 --reason "Vor Einführung des Programms erstellt und versandt"
 docker compose run --rm app invoices export --year 2025   # CSV + index.xml export for a tax audit
 ```
 

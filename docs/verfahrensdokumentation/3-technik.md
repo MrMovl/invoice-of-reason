@@ -17,7 +17,8 @@ nummerierte Migrationen `MIGRATIONS`).
 | `system.py` | Programmversion, Konfigurationshistorie, Kontrollprotokoll |
 | `backup.py` | Datensicherung, Prüfung, Wiederherstellung, Wiederherstellungstest |
 | `export.py` | Datenexport (Z3) |
-| `cli.py` | Kommandozeile: `verify`, `backup`, `verify-backup`, `restore-test`, `restore`, `export` |
+| `invoice_import.py` | Import vor dem Programm erstellter Rechnungen (nur Kommandozeile) |
+| `cli.py` | Kommandozeile: `verify`, `backup`, `verify-backup`, `restore-test`, `restore`, `export`, `import-invoice` |
 
 ## 3.2 Datenmodell
 
@@ -41,10 +42,10 @@ Alle Zeitstempel (`created_at`, `updated_at`, `at`) sind UTC im Format ISO 8601
 | `paid_date` | Zahlungseingang | ja, protokolliert |
 | `payment_method` | `bank` Überweisung/Karte, `cash` bar, leer = nicht erfasst (vor Einführung des Feldes) | ja, protokolliert |
 | `notes` | interne Notiz | ja, protokolliert |
-| `source` | `generated` im Programm erstellt, `imported` einmalig aus vorhandenem PDF übernommen | nein |
+| `source` | `generated` im Programm erstellt, `imported` vor Einführung des Programms erstellt, Original-PDF unverändert übernommen (Teil 2.9) | nein |
 | `pdf_path` | Pfad unter `data/archive/` | nein |
 | `pdf_sha256`, `pdf_size` | Prüfsumme und Größe der PDF | nein |
-| `payload_json` | vollständige Eingabedaten und Absenderdaten (Name, Anschrift, Steuernummer, Bankverbindung) zum Erstellungszeitpunkt | nein |
+| `payload_json` | erstellt: vollständige Eingabedaten und Absenderdaten (Name, Anschrift, Steuernummer, Bankverbindung) zum Erstellungszeitpunkt; importiert: Grund, ursprünglicher Dateiname, bestätigte Hinweise, Programmversion (Absenderdaten stehen nur in der Original-PDF) | nein |
 | `retain_until` | Ende der Aufbewahrung (31.12. des Rechnungsjahres + eingestellte Jahre) | nein |
 | `created_at`, `updated_at` | Erfassung, letzte Änderung | `updated_at` ja |
 
@@ -85,7 +86,8 @@ Alle Zeitstempel (`created_at`, `updated_at`, `at`) sind UTC im Format ISO 8601
 | `state_hash` | Hash des Datensatzes nach dieser Änderung (3.4) |
 
 Aktionen `events`: `created` erstellt (Detail: `sha256=<PDF-Prüfsumme>`, ggf. Grund für abweichende
-Nummer), `imported` übernommen, `status:open`, `status:paid`, `status:cancelled` Statusänderung,
+Nummer), `imported` übernommen (Detail: Prüfsumme, Grund, Originaldatei, ggf. Abweichung vom
+Nummernkreis und bestätigte Hinweise), `status:open`, `status:paid`, `status:cancelled` Statusänderung,
 `notes` Notiz geändert, `sealed` Zustand beim Einführen der Hash-Kette festgehalten.
 
 Aktionen `expense_events`: `uploaded` hochgeladen (`sha256=…`), `reviewed` erstmals geprüft und
