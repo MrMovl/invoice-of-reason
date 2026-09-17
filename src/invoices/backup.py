@@ -36,13 +36,14 @@ def create_backup(settings: Settings) -> Path:
     try:
         target = _create_backup(settings)
     except Exception as e:
-        _record(settings, "backup", False, str(e))
+        record_run(settings, "backup", False, str(e))
         raise
-    _record(settings, "backup", True, target.name)
+    record_run(settings, "backup", True, target.name)
     return target
 
 
-def _record(settings: Settings, kind: str, ok: bool, detail: str) -> None:
+def record_run(settings: Settings, kind: str, ok: bool, detail: str) -> None:
+    """Record a control run in the live database (opened separately: callers may have none)."""
     conn = db.connect(settings.db_path)
     try:
         db.init_db(conn)
@@ -193,8 +194,8 @@ def restore_test(settings: Settings, path: Path) -> str:
         if problems:
             raise BackupError("; ".join(f"{n}: {p}" for n, p in problems))
     except (BackupError, OSError, tarfile.TarError, sqlite3.DatabaseError) as e:
-        _record(settings, "restore_test", False, f"{path.name}: {e}")
+        record_run(settings, "restore_test", False, f"{path.name}: {e}")
         raise BackupError(str(e)) from e
     summary = f"{path.name}: {invoices} Rechnungen, {documents} Belege wiederhergestellt und geprüft"
-    _record(settings, "restore_test", True, summary)
+    record_run(settings, "restore_test", True, summary)
     return summary
