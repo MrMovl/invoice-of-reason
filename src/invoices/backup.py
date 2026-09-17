@@ -17,7 +17,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import archive, db, expenses
+from . import archive, db, expenses, system
 from .config import Settings
 
 BACKUP_RE = re.compile(r"^invoices-backup-\d{8}-\d{6}\.tar\.gz$")
@@ -32,6 +32,26 @@ def _sha256(path: Path) -> str:
 
 
 def create_backup(settings: Settings) -> Path:
+    """Create a backup and record the run, successful or not, in control_runs."""
+    try:
+        target = _create_backup(settings)
+    except Exception as e:
+        _record(settings, "backup", False, str(e))
+        raise
+    _record(settings, "backup", True, target.name)
+    return target
+
+
+def _record(settings: Settings, kind: str, ok: bool, detail: str) -> None:
+    conn = db.connect(settings.db_path)
+    try:
+        db.init_db(conn)
+        system.control_run(conn, kind, ok, detail)
+    finally:
+        conn.close()
+
+
+def _create_backup(settings: Settings) -> Path:
     settings.backup_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     target = settings.backup_dir / f"invoices-backup-{stamp}.tar.gz"
@@ -142,3 +162,28 @@ def restore_backup(path: Path, data_dir: Path) -> None:
     for p in (*(data_dir / "archive").rglob("*.pdf"), *(data_dir / "expenses").rglob("*")):
         if p.is_file():
             p.chmod(0o444)
+
+
+def restore_test(settings: Settings, path: Path) -> str:
+    """Restore a backup into a temporary directory and verify every file against the restored
+    database. Records the result in control_runs. Returns a summary, raises BackupError."""
+    try:
+        with tempfile.TemporaryDirectory(prefix="restore-test-") as tmp:
+            target = Path(tmp) / "data"
+            restore_backup(path, target)
+            conn = db.connect(target / "invoices.sqlite3")
+            try:
+                problems = archive.verify_all(conn, target / "archive") \
+                    + expenses.verify_all(conn, target / "expenses")
+                invoices = conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
+                documents = conn.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
+            finally:
+                conn.close()
+        if problems:
+            raise BackupError("; ".join(f"{n}: {p}" for n, p in problems))
+    except (BackupError, OSError, tarfile.TarError, sqlite3.DatabaseError) as e:
+        _record(settings, "restore_test", False, f"{path.name}: {e}")
+        raise BackupError(str(e)) from e
+    summary = f"{path.name}: {invoices} Rechnungen, {documents} Belege wiederhergestellt und geprüft"
+    _record(settings, "restore_test", True, summary)
+    return summary

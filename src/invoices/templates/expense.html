@@ -57,7 +57,7 @@
         <button class="btn btn-primary" type="submit">{{ 'Speichern' if exp.reviewed else 'Geprüft, speichern' }}</button>
         {% if next_review %}<button class="btn" type="submit" name="next" value="review">Speichern und nächster</button>{% endif %}
       </div>
-      <p class="hint">„Verworfen“ für Fehl-Uploads: der Beleg bleibt archiviert, zählt aber nicht mit.</p>
+      <p class="hint">„Verworfen“ für Fehl-Uploads, mit Grund in der Notiz: der Beleg bleibt archiviert, zählt aber nicht mit.</p>
     </form>
   </section>
 

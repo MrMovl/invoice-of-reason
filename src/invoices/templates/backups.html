@@ -38,4 +38,27 @@
 {% else %}
 <p class="card empty">Noch keine Backups.</p>
 {% endif %}
+
+<h2>Kontrollprotokoll</h2>
+<p class="lede">Durchgeführte Prüfungen, Backups und Wiederherstellungstests. Einträge können nicht geändert oder gelöscht werden.</p>
+{% if runs %}
+<div class="table-wrap card">
+<table>
+  <thead><tr><th>Zeitpunkt</th><th>Kontrolle</th><th>Ergebnis</th><th>Details</th><th>Version</th></tr></thead>
+  <tbody>
+  {% for r in runs %}
+  <tr>
+    <td><time>{{ r.at[:10]|de_date }} {{ r.at[11:16] }} UTC</time></td>
+    <td>{{ control_labels.get(r.kind, r.kind) }}</td>
+    <td>{% if r.ok %}<span class="badge badge-paid">OK</span>{% else %}<span class="badge badge-overdue">Fehler</span>{% endif %}</td>
+    <td class="muted">{{ r.detail }}</td>
+    <td><code>{{ r.app_version }}</code></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="card empty">Noch keine Kontrollen protokolliert.</p>
+{% endif %}
 {% endblock %}

@@ -23,6 +23,9 @@ ENV PYTHONPATH=/app/src \
     INVOICES_DATA_DIR=/data \
     INVOICES_BACKUP_DIR=/backups \
     INVOICES_SENDER_FILE=/config/sender.toml
+# Set by deploy.sh to the git commit. Recorded in the database on every change (GoBD Rz. 154).
+ARG APP_VERSION=dev
+ENV INVOICES_VERSION=$APP_VERSION
 
 USER app
 EXPOSE 8000

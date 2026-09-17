@@ -25,7 +25,7 @@ from flask import (
     url_for,
 )
 
-from . import archive, auth, backup, db, expenses
+from . import archive, auth, backup, db, expenses, system
 from .config import ConfigError, load_sender
 from .pdf import LayoutOverflowError, format_amount, format_date
 
@@ -33,6 +33,12 @@ bp = Blueprint("web", __name__)
 
 STATUS_LABELS = {"open": "Offen", "paid": "Bezahlt", "cancelled": "Storniert"}
 EXPENSE_STATUS_LABELS = {"paid": "Bezahlt", "open": "Offen", "void": "Verworfen"}
+CONTROL_LABELS = {
+    "verify": "Integritätsprüfung",
+    "backup": "Backup",
+    "restore_test": "Wiederherstellungstest",
+    "export": "Datenexport",
+}
 EVENT_LABELS = {
     "created": "Erstellt",
     "uploaded": "Hochgeladen",
@@ -98,6 +104,7 @@ def inject_globals():
         "status_labels": STATUS_LABELS,
         "expense_status_labels": EXPENSE_STATUS_LABELS,
         "current_user": session.get("user"),
+        "app_version": system.app_version(),
     }
 
 
@@ -276,6 +283,8 @@ def invoice_create():
     s = settings()
     try:
         inp = archive.parse_invoice_form(request.form)
+        # sender.toml can change without a restart: log it before it shapes a new invoice.
+        system.record_config(conn, s)
         invoice_id = archive.issue_invoice(conn, s.archive_dir, inp, _load_sender(), s.retention_years)
     except (archive.ArchiveError, LayoutOverflowError) as e:
         flash(str(e), "error")
@@ -333,8 +342,11 @@ def invoice_status(invoice_id: int):
 @auth.login_required
 def invoice_notes(invoice_id: int):
     _get_invoice(invoice_id)
-    archive.set_notes(get_db(), invoice_id, request.form.get("notes", ""))
-    flash("Notiz gespeichert.", "ok")
+    try:
+        archive.set_notes(get_db(), invoice_id, request.form.get("notes", ""))
+        flash("Notiz gespeichert.", "ok")
+    except archive.ArchiveError as e:
+        flash(str(e), "error")
     return redirect(url_for("web.invoice_detail", invoice_id=invoice_id))
 
 
@@ -489,8 +501,10 @@ def backup_list():
         + expenses.verify_all(conn, settings().expenses_dir)
     count = conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
     expense_count = conn.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
+    runs = conn.execute("SELECT * FROM control_runs ORDER BY id DESC LIMIT 20").fetchall()
     return render_template("backups.html", backups=backup.list_backups(settings()),
-                           problems=problems, count=count, expense_count=expense_count)
+                           problems=problems, count=count, expense_count=expense_count, runs=runs,
+                           control_labels=CONTROL_LABELS)
 
 
 @bp.post("/backups")

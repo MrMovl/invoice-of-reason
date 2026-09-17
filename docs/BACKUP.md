@@ -48,4 +48,11 @@ can be added later without touching the app:
 | USB disk on the Pi | cron | Protects against SD card death, not against theft/fire. |
 
 Whichever is chosen: keep at least one copy outside the house, and test a restore once a year
-(`invoices verify-backup` on the off-site copy).
+with `invoices restore-test <file>` on the off-site copy. It restores into a temporary directory,
+verifies every document against the restored database and records the result in the control log.
+
+## Control log
+
+Every `verify`, backup (automatic, manual, failed) and `restore-test` run is written to the
+append-only `control_runs` table and listed on the Backups page (GoBD Rz. 100: controls are
+performed and logged).

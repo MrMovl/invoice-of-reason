@@ -150,9 +150,83 @@ def connect(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+# Schema changes after the initial schema. Each entry runs once, in order, inside one
+# transaction, and is recorded in system_events (GoBD Rz. 142: migrations are documented).
+# PRAGMA user_version holds the number of applied migrations. Never edit an applied entry.
+MIGRATIONS: list[tuple[str, str]] = [
+    (
+        "system_events and control_runs",
+        """
+        CREATE TABLE system_events (
+            id      INTEGER PRIMARY KEY,
+            at      TEXT NOT NULL,
+            action  TEXT NOT NULL,             -- version, schema_migration, config_changed
+            detail  TEXT NOT NULL DEFAULT ''
+        );
+        CREATE TRIGGER system_events_append_only_update BEFORE UPDATE ON system_events
+        BEGIN SELECT RAISE(ABORT, 'events are append-only'); END;
+        CREATE TRIGGER system_events_append_only_delete BEFORE DELETE ON system_events
+        BEGIN SELECT RAISE(ABORT, 'events are append-only'); END;
+
+        CREATE TABLE control_runs (
+            id          INTEGER PRIMARY KEY,
+            at          TEXT NOT NULL,
+            kind        TEXT NOT NULL,         -- verify, backup, restore_test, export
+            ok          INTEGER NOT NULL CHECK (ok IN (0, 1)),
+            detail      TEXT NOT NULL DEFAULT '',
+            app_version TEXT NOT NULL DEFAULT ''
+        );
+        CREATE TRIGGER control_runs_append_only_update BEFORE UPDATE ON control_runs
+        BEGIN SELECT RAISE(ABORT, 'control runs are append-only'); END;
+        CREATE TRIGGER control_runs_append_only_delete BEFORE DELETE ON control_runs
+        BEGIN SELECT RAISE(ABORT, 'control runs are append-only'); END;
+        """,
+    ),
+]
+
+
+def schema_version(conn: sqlite3.Connection) -> int:
+    return conn.execute("PRAGMA user_version").fetchone()[0]
+
+
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
     conn.commit()
+    migrate(conn)
+
+
+def migrate(conn: sqlite3.Connection) -> None:
+    for number, (description, sql) in enumerate(MIGRATIONS, start=1):
+        # Re-read inside the loop: another process may have migrated concurrently.
+        if schema_version(conn) >= number:
+            continue
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            if schema_version(conn) >= number:
+                conn.rollback()
+                continue
+            for statement in _statements(sql):
+                conn.execute(statement)
+            conn.execute(f"PRAGMA user_version = {number}")
+            add_system_event(conn, "schema_migration", f"{number}: {description}")
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+
+
+def _statements(sql: str) -> list[str]:
+    """Split a migration script into statements; trigger bodies contain ';' too."""
+    statements, current = [], ""
+    for line in sql.splitlines(keepends=True):
+        current += line
+        if sqlite3.complete_statement(current):
+            if current.strip():
+                statements.append(current.strip())
+            current = ""
+    if current.strip():
+        raise ValueError(f"incomplete migration statement: {current.strip()[:80]}")
+    return statements
 
 
 def add_event(conn: sqlite3.Connection, invoice_id: int, action: str, detail: str = "") -> None:
@@ -167,3 +241,25 @@ def add_expense_event(conn: sqlite3.Connection, expense_id: int, action: str, de
         "INSERT INTO expense_events (expense_id, at, action, detail) VALUES (?, ?, ?, ?)",
         (expense_id, now_iso(), action, detail),
     )
+
+
+def add_system_event(conn: sqlite3.Connection, action: str, detail: str = "") -> None:
+    conn.execute(
+        "INSERT INTO system_events (at, action, detail) VALUES (?, ?, ?)",
+        (now_iso(), action, detail),
+    )
+
+
+def last_system_event(conn: sqlite3.Connection, action: str):
+    return conn.execute(
+        "SELECT * FROM system_events WHERE action = ? ORDER BY id DESC LIMIT 1", (action,)
+    ).fetchone()
+
+
+def add_control_run(conn: sqlite3.Connection, kind: str, ok: bool, detail: str = "",
+                    app_version: str = "") -> None:
+    with conn:
+        conn.execute(
+            "INSERT INTO control_runs (at, kind, ok, detail, app_version) VALUES (?, ?, ?, ?, ?)",
+            (now_iso(), kind, int(ok), detail, app_version),
+        )

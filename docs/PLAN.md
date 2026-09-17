@@ -37,6 +37,9 @@ Reachable at `invoices.example.com` behind a login.
   paid/open/void, paid date, notes) stays correctable; `reviewed` flips to 1 on the first save.
   Wrong uploads are set to "Verworfen" (void) instead of deleted.
 - `expense_events`: append-only log of uploads and every change with old -> new values.
+- `system_events`: append-only log of schema migrations, deployed versions and configuration changes
+  (sender data, retention). `PRAGMA user_version` counts applied migrations (`db.MIGRATIONS`).
+- `control_runs`: append-only log of verify, backup and restore-test runs with result and version.
 
 ## Expenses
 

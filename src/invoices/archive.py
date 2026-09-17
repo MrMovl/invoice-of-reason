@@ -273,32 +273,57 @@ def _record(conn, archive_dir: Path, rel_path: str, pdf: bytes, source: str, row
     return invoice_id
 
 
+STATUS_NAMES = {"open": "Offen", "paid": "Bezahlt", "cancelled": "Storniert"}
+
+
+def quote(text: str) -> str:
+    return f"„{text}“" if text else "–"
+
+
 def set_status(conn: sqlite3.Connection, invoice_id: int, status: str,
                paid_date: date | None = None, note: str = "") -> None:
-    if status not in ("open", "paid", "cancelled"):
+    """Change the payment status. The event records old and new values (GoBD Rz. 58)."""
+    if status not in STATUS_NAMES:
         raise ArchiveError("Unbekannter Status.")
     if status == "paid" and paid_date is None:
         raise ArchiveError("Zahlungsdatum fehlt.")
-    note = note.strip()[:500]
+    note = note.replace("\r\n", "\n").strip()
+    if len(note) > 500:
+        raise ArchiveError("Grund ist zu lang (max. 500 Zeichen).")
+    if status == "cancelled" and not note:
+        raise ArchiveError("Grund für die Stornierung fehlt.")
+    new_paid = paid_date.isoformat() if status == "paid" else None
     with conn:
-        updated = conn.execute(
-            "UPDATE invoices SET status = ?, paid_date = ?, updated_at = ? WHERE id = ?",
-            (status, paid_date.isoformat() if status == "paid" else None, db.now_iso(), invoice_id),
-        ).rowcount
-        if not updated:
+        row = conn.execute("SELECT status, paid_date FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+        if row is None:
             raise ArchiveError("Rechnung nicht gefunden.")
-        detail = f"paid_date={paid_date.isoformat()}" if status == "paid" else ""
+        conn.execute("UPDATE invoices SET status = ?, paid_date = ?, updated_at = ? WHERE id = ?",
+                     (status, new_paid, db.now_iso(), invoice_id))
+        changes = [f"Status: {STATUS_NAMES[row['status']]} → {STATUS_NAMES[status]}"]
+        if row["paid_date"] != new_paid:
+            changes.append(f"Bezahlt am: {_de(row['paid_date'])} → {_de(new_paid)}")
         if note:
-            detail = f"{detail} {note}".strip()
-        db.add_event(conn, invoice_id, f"status:{status}", detail)
+            changes.append(f"Grund: {quote(note)}")
+        db.add_event(conn, invoice_id, f"status:{status}", "; ".join(changes))
+
+
+def _de(iso: str | None) -> str:
+    return format_date(date.fromisoformat(iso)) if iso else "–"
 
 
 def set_notes(conn: sqlite3.Connection, invoice_id: int, notes: str) -> None:
-    notes = notes.replace("\r\n", "\n").strip()[:2000]
+    notes = notes.replace("\r\n", "\n").strip()
+    if len(notes) > 2000:
+        raise ArchiveError("Notiz ist zu lang (max. 2000 Zeichen).")
     with conn:
+        row = conn.execute("SELECT notes FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+        if row is None:
+            raise ArchiveError("Rechnung nicht gefunden.")
+        if row["notes"] == notes:
+            return
         conn.execute("UPDATE invoices SET notes = ?, updated_at = ? WHERE id = ?",
                      (notes, db.now_iso(), invoice_id))
-        db.add_event(conn, invoice_id, "notes")
+        db.add_event(conn, invoice_id, "notes", f"Notiz: {quote(row['notes'])} → {quote(notes)}")
 
 
 def verify_file(path: Path, sha256: str, missing: str = "PDF fehlt") -> str | None:

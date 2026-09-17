@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import archive, backup, db, expenses
+from . import archive, backup, db, expenses, system
 from .config import load_settings
 
 
@@ -41,8 +41,13 @@ def cmd_verify(_args) -> int:
     problems = archive.verify_all(conn, s.archive_dir) + expenses.verify_all(conn, s.expenses_dir)
     for number, problem in problems:
         print(f"FEHLER {number}: {problem}", file=sys.stderr)
-    if not problems:
-        print(f"OK: {count} Rechnungen und {expense_count} Belege geprüft.")
+    summary = f"{count} Rechnungen und {expense_count} Belege geprüft"
+    if problems:
+        system.control_run(conn, "verify", False, "; ".join(f"{n}: {p}" for n, p in problems))
+    else:
+        system.control_run(conn, "verify", True, summary)
+        print(f"OK: {summary}.")
+    conn.close()
     return 1 if problems else 0
 
 
@@ -84,6 +89,16 @@ def cmd_restore(args) -> int:
     return 0
 
 
+def cmd_restore_test(args) -> int:
+    try:
+        summary = backup.restore_test(load_settings(), Path(args.file))
+    except backup.BackupError as e:
+        print(f"FEHLER: {e}", file=sys.stderr)
+        return 1
+    print(f"OK: {summary}.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="invoices")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -96,6 +111,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("verify-backup", help="Backup-Datei gegen ihr Manifest prüfen")
     p.add_argument("file")
     p.set_defaults(func=cmd_verify_backup)
+    p = sub.add_parser("restore-test", help="Backup testweise wiederherstellen, prüfen und protokollieren")
+    p.add_argument("file")
+    p.set_defaults(func=cmd_restore_test)
     p = sub.add_parser("restore", help="Backup in ein leeres Datenverzeichnis wiederherstellen")
     p.add_argument("file")
     p.add_argument("data_dir")

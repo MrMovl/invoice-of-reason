@@ -71,6 +71,7 @@ Strongly recommended: also add a Cloudflare Access application for `invoices.exa
 docker compose logs -f app
 docker compose exec app invoices verify         # check all archived invoices and expense documents
 docker compose run --rm app invoices backup     # extra backup now
+docker compose run --rm app invoices restore-test /backups/<file>   # restore into a temp dir, verify, log it
 ```
 
 ## License

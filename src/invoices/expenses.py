@@ -17,6 +17,7 @@ from pathlib import Path
 from . import db, extract
 from .archive import (
     ArchiveError,
+    quote,
     _clean,
     _write_once,
     parse_amount,
@@ -144,8 +145,15 @@ def parse_expense_form(form) -> dict:
         "category": _clean(form.get("category"), "Kategorie", 60, required=False),
         "status": status,
         "paid_date": _iso(paid_date) if status == "paid" else None,
-        "notes": (form.get("notes") or "").replace("\r\n", "\n").strip()[:2000],
+        "notes": _clean_notes(form.get("notes")),
     }
+
+
+def _clean_notes(value: str | None) -> str:
+    notes = (value or "").replace("\r\n", "\n").strip()
+    if len(notes) > 2000:
+        raise ArchiveError("Notiz ist zu lang (max. 2000 Zeichen).")
+    return notes
 
 
 def _iso(d: date | None) -> str | None:
@@ -160,7 +168,7 @@ def _show(field: str, value) -> str:
     if field in ("expense_date", "paid_date"):
         return format_date(date.fromisoformat(value))
     if field == "notes":
-        return "…"
+        return quote(value)
     return str(value)
 
 
@@ -169,6 +177,8 @@ def update_expense(conn: sqlite3.Connection, expense_id: int, values: dict) -> N
     row = conn.execute("SELECT * FROM expenses WHERE id = ?", (expense_id,)).fetchone()
     if row is None:
         raise ArchiveError("Beleg nicht gefunden.")
+    if values["status"] == "void" and row["status"] != "void" and not values["notes"]:
+        raise ArchiveError("Grund für das Verwerfen fehlt (Notiz).")
     changes = [
         f"{FIELD_LABELS[k]}: {_show(k, row[k])} → {_show(k, v)}"
         for k, v in values.items() if row[k] != v
@@ -179,7 +189,7 @@ def update_expense(conn: sqlite3.Connection, expense_id: int, values: dict) -> N
                      (*values.values(), db.now_iso(), expense_id))
         if changes or not row["reviewed"]:
             db.add_expense_event(conn, expense_id, "reviewed" if not row["reviewed"] else "updated",
-                                 "; ".join(changes)[:1000])
+                                 "; ".join(changes))
 
 
 def booking_date_sql() -> str:
