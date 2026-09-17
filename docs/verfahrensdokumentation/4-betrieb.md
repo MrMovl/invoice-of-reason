@@ -67,7 +67,8 @@ Technische Details zu Befehlen: `README.md`, `docs/BACKUP.md`, `docs/EXPORT.md` 
   „Datenexport für die Betriebsprüfung“. Ergebnis: ZIP-Datei mit
   - je einer CSV-Datei pro Tabelle (Kopfzeile, Semikolon, Dezimalkomma, CR LF, UTF-8, alle Spalten
     ungefiltert),
-  - `index.xml` nach dem Beschreibungsstandard (GDPdU-DTD) mit Feldbeschreibungen und Verknüpfungen,
+  - `index.xml` nach dem Beschreibungsstandard mit Feldbeschreibungen und Verknüpfungen, dazu die
+    DTD `gdpdu-01-03-2019.dtd` (Version 1.6); Datensätze ab Zeile 2 jeder CSV-Datei,
   - allen zugehörigen Rechnungs-PDFs und Belegdateien im Originalformat,
   - `README.txt` mit Erläuterungen zu Format, Verknüpfungen, Statuswerten, Protokollaktionen und
     der Hash-Kette.

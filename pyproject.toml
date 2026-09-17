@@ -25,7 +25,7 @@ invoices = "invoices.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-invoices = ["fonts/*", "templates/*.html", "static/*", "static/fonts/*"]
+invoices = ["fonts/*", "templates/*.html", "static/*", "static/fonts/*", "*.dtd"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

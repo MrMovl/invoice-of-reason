@@ -19,7 +19,8 @@ successful or not, is recorded in the control log (`control_runs.kind = export`)
 | File | |
 |------|---|
 | `invoices.csv`, `events.csv`, `expenses.csv`, `expense_events.csv`, `system_events.csv`, `control_runs.csv` | One CSV per table. Any table a later migration adds is exported too. |
-| `index.xml` | GDPdU "Beschreibungsstandard", `<!DOCTYPE DataSet SYSTEM "gdpdu-01-09-2004.dtd">` |
+| `index.xml` | GDPdU "Beschreibungsstandard", `<!DOCTYPE DataSet SYSTEM "gdpdu-01-03-2019.dtd">` |
+| `gdpdu-01-03-2019.dtd` | The DTD, which the standard requires next to `index.xml` |
 | `archive/<pdf_path>` | Archived invoice PDFs |
 | `expenses/<doc_path>` | Uploaded expense documents, original format |
 | `README.txt` | German explanation for the auditor: format, links between tables, status values, event actions |
@@ -43,6 +44,11 @@ successful or not, is recorded in the control log (`control_runs.kind = export`)
 - **Integrity**: the hash chains, record states and triggers are verified and every document is
   checked against its SHA-256 first; any problem aborts the export. The table rows are read in one SQLite transaction.
 
-The DTD file itself is not shipped: it is published by the BMF / the IDEA vendor (Audicon), and
-the auditor's software brings it. `DataSupplier` name and location come from `config/sender.toml`
-(empty if it cannot be loaded).
+The DTD (`src/invoices/gdpdu-01-03-2019.dtd`, version 1.6) is taken verbatim from the
+"Beschreibungsstandard GDPdU/GoBD" published by Audicon / CaseWare Germany. Each table declares
+`<Range><From>2</From></Range>` because the CSVs start with a header row, as the standard's FAQ
+prescribes. The tests validate every generated `index.xml` against this DTD with `xmllint`. The
+official DTD's `Media` content model (`Command*, Table*, Command*`) is not deterministic by strict
+XML rules, which libxml2 rejects, so the tests validate against a copy with the trailing
+`Command*` removed; the exports never contain `Command` elements, so this changes nothing for them.
+`DataSupplier` name and location come from `config/sender.toml` (empty if it cannot be loaded).

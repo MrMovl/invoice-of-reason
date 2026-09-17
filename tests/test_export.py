@@ -3,6 +3,8 @@
 import csv
 import io
 import re
+import shutil
+import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
 
@@ -116,13 +118,15 @@ def test_index_xml_describes_every_csv_in_order(store):
         raw_index = zf.read("index.xml")
         index = ET.fromstring(raw_index)
         csvs = sorted(n for n in zf.namelist() if n.endswith(".csv"))
-        assert b'<!DOCTYPE DataSet SYSTEM "gdpdu-01-09-2004.dtd">' in raw_index
+        assert b'<!DOCTYPE DataSet SYSTEM "gdpdu-01-03-2019.dtd">' in raw_index
+        assert zf.read("gdpdu-01-03-2019.dtd") == export.DTD_PATH.read_bytes()
         assert index.tag == "DataSet" and index.findtext("Version") == "1.0"
         assert index.find("DataSupplier").findtext("Name") == "Erika Mustermann"
         tables = index.find("Media").findall("Table")
         assert sorted(t.findtext("URL") for t in tables) == csvs
         for t in tables:
             assert t.find("UTF8") is not None and t.findtext("DecimalSymbol") == ","
+            assert t.find("Range").findtext("From") == "2"
             layout = t.find("VariableLength")
             assert layout.findtext("ColumnDelimiter") == ";"
             assert layout.findtext("RecordDelimiter") == "\r\n"
@@ -191,3 +195,23 @@ def test_web_export(logged_in, csrf):
     assert logged_in.get("/backups/exports/..%2Finvoices.sqlite3").status_code == 404
     assert logged_in.get("/backups/exports/gobd-export-2026-x.zip").status_code == 404
     assert logged_in.post("/backups/exports", data={"year": "2026"}).status_code == 400
+
+
+@pytest.mark.skipif(not shutil.which("xmllint"), reason="xmllint not installed")
+def test_index_xml_is_valid_against_the_official_dtd(store, tmp_path):
+    s, conn = store
+    issue(s, conn)
+    with zipfile.ZipFile(export.create_export(s)) as zf:
+        zf.extract("index.xml", tmp_path)
+    # libxml2 rejects the official Media model as non-deterministic (Command*, Table*, Command*).
+    # Exports contain no Command elements, so validating without the trailing Command* is equivalent.
+    official = "<!ELEMENT Media (Name, Command*, Table*, Command*, AcceptNoTables?)>"
+    dtd = export.DTD_PATH.read_text()
+    assert official in dtd
+    strict = tmp_path / "strict.dtd"
+    strict.write_text(dtd.replace(official, "<!ELEMENT Media (Name, Command*, Table*, AcceptNoTables?)>"))
+    result = subprocess.run(["xmllint", "--noout", "--nonet", "--dtdvalid", str(strict),
+                             str(tmp_path / "index.xml")], capture_output=True, text=True)
+    errors = [line for line in result.stderr.splitlines() if "failed to load" not in line
+              and "DOCTYPE" not in line and line.strip() != "^"]
+    assert result.returncode == 0, "\n".join(errors)

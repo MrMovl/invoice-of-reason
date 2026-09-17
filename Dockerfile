@@ -39,7 +39,7 @@ CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "4", "
 # Test stage: `docker build --target test .` runs the suite against the Debian packages.
 FROM runtime AS test
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends python3-pytest && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends python3-pytest libxml2-utils && rm -rf /var/lib/apt/lists/*
 COPY tests ./tests
 COPY pyproject.toml ./
 USER app

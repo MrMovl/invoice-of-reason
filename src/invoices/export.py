@@ -23,7 +23,9 @@ from .config import ConfigError, Settings, load_sender
 
 EXPORT_RE = re.compile(r"^gobd-export-(\d{4}|alle)-\d{8}-\d{6}\.zip$")
 YEAR_RE = re.compile(r"^\d{4}$")
-DTD = "gdpdu-01-09-2004.dtd"
+# The standard requires the DTD next to index.xml. Version 1.6 is backwards compatible with 1.5.
+DTD = "gdpdu-01-03-2019.dtd"
+DTD_PATH = Path(__file__).with_name(DTD)
 
 # Known tables in export order; any other table found in the schema follows, unfiltered.
 TABLES = {
@@ -156,6 +158,7 @@ def _create_export(settings: Settings, year: str | None) -> Path:
         partial = Path(tmp) / target.name
         with zipfile.ZipFile(partial, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("index.xml", index_xml(settings, year, [(n, c) for n, c, _r in tables]))
+            zf.write(DTD_PATH, DTD)
             zf.writestr("README.txt", README.replace("\n", "\r\n").format(
                 zeitraum=f"Jahr {year}" if year else "alle Jahre",
                 erstellt=db.now_iso(), version=system.app_version()))
@@ -269,6 +272,8 @@ def index_xml(settings: Settings, year: str | None, tables: list[tuple[str, list
         ET.SubElement(table, "UTF8")
         ET.SubElement(table, "DecimalSymbol").text = ","
         ET.SubElement(table, "DigitGroupingSymbol").text = "."
+        # Every CSV starts with a header row; without this the audit software imports it as data.
+        ET.SubElement(ET.SubElement(table, "Range"), "From").text = "2"
         layout = ET.SubElement(table, "VariableLength")
         ET.SubElement(layout, "ColumnDelimiter").text = ";"
         ET.SubElement(layout, "RecordDelimiter").text = CRLF_MARK
@@ -308,8 +313,9 @@ Programmversion: {version}
 Inhalt
 ------
 index.xml             Beschreibung aller Tabellen nach dem GDPdU-Beschreibungsstandard
-                      (DTD gdpdu-01-09-2004.dtd). Die DTD selbst liegt nicht bei; sie ist beim
-                      BMF bzw. beim Hersteller der Prüfsoftware (IDEA) erhältlich.
+                      (DTD gdpdu-01-03-2019.dtd, Version 1.6, liegt bei). Datensätze beginnen in
+                      Zeile 2 jeder CSV-Datei (Range/From = 2), Zeile 1 enthält die Feldnamen.
+gdpdu-01-03-2019.dtd  DTD des Beschreibungsstandards
 invoices.csv          Ausgangsrechnungen
 events.csv            Änderungsprotokoll der Ausgangsrechnungen
 expenses.csv          Eingangsbelege (Ausgaben)
