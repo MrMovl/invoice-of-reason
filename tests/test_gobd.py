@@ -136,10 +136,11 @@ def test_status_logs_old_and_new_values(store):
     archive.set_status(conn, inv_id, "paid", date(2026, 9, 20), payment_method="bank")
     assert tuple(last_event(conn)) == ("status:paid", "Status: Offen → Bezahlt; Bezahlt am: – → 20.09.2026; "
                                                       "Zahlungsart: – → Überweisung/Karte")
-    archive.set_status(conn, inv_id, "cancelled", note="Doppelt gestellt")
+    archive.set_status(conn, inv_id, "open")
     assert last_event(conn)["detail"] == \
-        "Status: Bezahlt → Storniert; Bezahlt am: 20.09.2026 → –; Zahlungsart: Überweisung/Karte → –; " \
-        "Grund: „Doppelt gestellt“"
+        "Status: Bezahlt → Offen; Bezahlt am: 20.09.2026 → –; Zahlungsart: Überweisung/Karte → –"
+    archive.set_status(conn, inv_id, "cancelled", note="Doppelt gestellt")
+    assert last_event(conn)["detail"] == "Status: Offen → Storniert; Grund: „Doppelt gestellt“"
 
 
 def test_cancel_requires_reason(store):

@@ -241,7 +241,8 @@ def invoice_list():
     return render_template("list.html", turnover=_turnover(conn), rows=rows, years=years, year=year, status=status,
                            q=q, totals=totals, today=today,
                            cash=expenses.cash_summary(conn, year),
-                           number_findings=archive.number_findings(conn))
+                           number_findings=archive.number_findings(conn),
+                           receipt_findings=archive.lost_receipt_findings(conn))
 
 
 def _turnover(conn) -> turnover.Status:

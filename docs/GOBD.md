@@ -146,6 +146,7 @@ Programmidentität. Rules that follow:
 | 18 | Reverse charge flag on expenses (§ 13b UStG) | done (`gobd/reverse-charge`) |
 | 19 | Capital assets excluded from the expense total | done (`gobd/capital-assets`); register and AfA stay outside |
 | 20 | Turnover limit monitor (§ 19 UStG since 2025) | done (`gobd/turnover-limit`) |
+| 21 | Hotfix: cancelling a paid invoice erased the receipt | done (`fix/paid-cancellation`); paid → cancelled refused, lost receipts reported |
 | 9 | Cancellation document | design proposal pending |
 
 ## Questions for the Steuerberater

@@ -131,6 +131,33 @@ def number_gaps(conn: sqlite3.Connection) -> dict[str, dict]:
     return dict(sorted(found.items(), reverse=True))
 
 
+PAID_CANCEL_MESSAGE = (
+    "Eine bezahlte Rechnung kann nicht einfach storniert werden: Der Zahlungseingang bliebe sonst "
+    "nicht erhalten. Sie braucht eine Stornorechnung und die Erfassung der Erstattung. Diese Funktion "
+    "folgt in Kürze; bis dahin bleibt die Rechnung bezahlt. War die Zahlung irrtümlich erfasst, "
+    "„Wieder auf offen setzen“."
+)
+
+
+def lost_receipt_findings(conn: sqlite3.Connection) -> list[str]:
+    """Cancelled invoices that were paid right before being cancelled: until the guard in
+    set_status, cancelling cleared the payment date, so the receipt is missing from the overview and
+    the turnover monitor. A payment that was first set back to open is a correction, not a finding.
+    Report only; nothing is changed."""
+    messages = []
+    for inv in conn.execute("SELECT id, number FROM invoices WHERE status = 'cancelled' ORDER BY number").fetchall():
+        statuses = conn.execute(
+            "SELECT action, detail FROM events WHERE invoice_id = ? AND action LIKE 'status:%' ORDER BY id",
+            (inv["id"],)).fetchall()
+        for before, after in zip(statuses, statuses[1:]):
+            if before["action"] == "status:paid" and after["action"] == "status:cancelled":
+                messages.append(f"Rechnung {inv['number']} wurde nach erfasster Zahlung storniert "
+                                f"({before['detail']}). Der Zahlungseingang fehlt in der Übersicht und bei "
+                                "der Umsatzgrenze; es gibt keine Stornorechnung.")
+                break
+    return messages
+
+
 def number_findings(conn: sqlite3.Connection) -> list[str]:
     """number_gaps as German messages, consecutive missing numbers joined into ranges."""
     messages = []
@@ -416,6 +443,10 @@ def set_status(conn: sqlite3.Connection, invoice_id: int, status: str,
                            (invoice_id,)).fetchone()
         if row is None:
             raise ArchiveError("Rechnung nicht gefunden.")
+        if row["status"] == "paid" and status == "cancelled":
+            # Cancelling would clear paid_date and erase a real receipt from the cash overview and
+            # the § 19 turnover monitor, even for a past year. A receipt is undone by a refund.
+            raise ArchiveError(PAID_CANCEL_MESSAGE)
         conn.execute("UPDATE invoices SET status = ?, paid_date = ?, payment_method = ?, updated_at = ? "
                      "WHERE id = ?", (status, new_paid, new_method, db.now_iso(), invoice_id))
         changes = [f"Status: {STATUS_NAMES[row['status']]} → {STATUS_NAMES[status]}"]
