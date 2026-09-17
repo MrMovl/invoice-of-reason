@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import archive, backup, db, expenses, system
+from . import archive, backup, db, expenses, export, system
 from .config import load_settings
 
 
@@ -99,6 +99,16 @@ def cmd_restore_test(args) -> int:
     return 0
 
 
+def cmd_export(args) -> int:
+    try:
+        path = export.create_export(load_settings(), args.year)
+    except (export.ExportError, OSError) as e:
+        print(f"FEHLER: {e}", file=sys.stderr)
+        return 1
+    print(path)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="invoices")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -114,6 +124,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("restore-test", help="Backup testweise wiederherstellen, prüfen und protokollieren")
     p.add_argument("file")
     p.set_defaults(func=cmd_restore_test)
+    p = sub.add_parser("export", help="Datenexport für die Betriebsprüfung (GoBD, CSV + index.xml) erstellen")
+    p.add_argument("--year", metavar="JJJJ", help="Nur dieses Jahr exportieren (Standard: alles)")
+    p.set_defaults(func=cmd_export)
     p = sub.add_parser("restore", help="Backup in ein leeres Datenverzeichnis wiederherstellen")
     p.add_argument("file")
     p.add_argument("data_dir")

@@ -25,7 +25,7 @@ from flask import (
     url_for,
 )
 
-from . import archive, auth, backup, db, expenses, system
+from . import archive, auth, backup, db, expenses, export, system
 from .config import ConfigError, load_sender
 from .pdf import LayoutOverflowError, format_amount, format_date
 
@@ -504,7 +504,8 @@ def backup_list():
     runs = conn.execute("SELECT * FROM control_runs ORDER BY id DESC LIMIT 20").fetchall()
     return render_template("backups.html", backups=backup.list_backups(settings()),
                            problems=problems, count=count, expense_count=expense_count, runs=runs,
-                           control_labels=CONTROL_LABELS)
+                           control_labels=CONTROL_LABELS, exports=export.list_exports(settings()),
+                           export_years=export.export_years(conn))
 
 
 @bp.post("/backups")
@@ -527,6 +528,28 @@ def backup_download(name: str):
     if not path.is_file():
         abort(404)
     return send_file(path, mimetype="application/gzip", as_attachment=True, download_name=name)
+
+
+@bp.post("/backups/exports")
+@auth.login_required
+def export_create():
+    try:
+        path = export.create_export(settings(), request.form.get("year") or None)
+        flash(f"Datenexport erstellt: {path.name}", "ok")
+    except export.ExportError as e:
+        flash(str(e), "error")
+    return redirect(url_for("web.backup_list"))
+
+
+@bp.get("/backups/exports/<name>")
+@auth.login_required
+def export_download(name: str):
+    if not export.EXPORT_RE.match(name):
+        abort(404)
+    path = settings().backup_dir / "exports" / name
+    if not path.is_file():
+        abort(404)
+    return send_file(path, mimetype="application/zip", as_attachment=True, download_name=name)
 
 
 @bp.app_errorhandler(400)

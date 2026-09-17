@@ -72,7 +72,10 @@ docker compose logs -f app
 docker compose exec app invoices verify         # check all archived invoices and expense documents
 docker compose run --rm app invoices backup     # extra backup now
 docker compose run --rm app invoices restore-test /backups/<file>   # restore into a temp dir, verify, log it
+docker compose run --rm app invoices export --year 2025   # CSV + index.xml export for a tax audit
 ```
+
+Tax audit data export (GoBD Z3): see [docs/EXPORT.md](docs/EXPORT.md).
 
 ## License
 
