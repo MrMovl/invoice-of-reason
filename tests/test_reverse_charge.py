@@ -185,3 +185,17 @@ def test_export_has_the_column_with_description(store):
     column = header.split(";").index("reverse_charge")
     assert first.split(";")[column] == "13b"
     assert "§ 13b UStG" in index
+
+
+def test_foreign_currency_hint_for_reverse_charge(logged_in, app):
+    s = app.config["SETTINGS"]
+    conn = db.connect(s.db_path)
+    usd = (FIXTURES / "ubl-invoice.xml").read_bytes().replace(b"<cbc:DocumentCurrencyCode>EUR", b"<cbc:DocumentCurrencyCode>USD")
+    usd = usd.replace(b'currencyID="EUR"', b'currencyID="USD"')
+    hinted = upload(s, conn, foreign(usd), "usd.xml")
+    euro = upload(s, conn, foreign((FIXTURES / "cii-invoice.xml").read_bytes()), "eur.xml")
+    conn.close()
+
+    page = logged_in.get(f"/expenses/{hinted}").get_data(as_text=True)
+    assert "§ 16 Abs. 6 UStG" in page and "Durchschnittskurs" in page
+    assert "§ 16 Abs. 6 UStG" not in logged_in.get(f"/expenses/{euro}").get_data(as_text=True)
