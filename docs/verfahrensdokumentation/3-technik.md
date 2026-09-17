@@ -45,7 +45,7 @@ Alle Zeitstempel (`created_at`, `updated_at`, `at`) sind UTC im Format ISO 8601
 | `source` | `generated` im Programm erstellt, `imported` vor Einführung des Programms erstellt, Original-PDF unverändert übernommen (Teil 2.9) | nein |
 | `pdf_path` | Pfad unter `data/archive/` | nein |
 | `pdf_sha256`, `pdf_size` | Prüfsumme und Größe der PDF | nein |
-| `payload_json` | erstellt: vollständige Eingabedaten und Absenderdaten (Name, Anschrift, Steuernummer, Bankverbindung) zum Erstellungszeitpunkt; importiert: Grund, ursprünglicher Dateiname, bestätigte Hinweise, Programmversion (Absenderdaten stehen nur in der Original-PDF) | nein |
+| `payload_json` | erstellt: vollständige Eingabedaten, Absenderdaten (Name, Anschrift, Steuernummer, Bankverbindung) und die fest gedruckten Texte (`texts.small_business_note`, ab 18.09.2026) zum Erstellungszeitpunkt; importiert: Grund, ursprünglicher Dateiname, bestätigte Hinweise, Programmversion (Absenderdaten stehen nur in der Original-PDF) | nein |
 | `retain_until` | Ende der Aufbewahrung (31.12. des Rechnungsjahres + eingestellte Jahre) | nein |
 | `created_at`, `updated_at` | Erfassung, letzte Änderung | `updated_at` ja |
 
