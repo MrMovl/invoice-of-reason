@@ -17,7 +17,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import archive, db, expenses, system
+from . import archive, chain, db, expenses, system
 from .config import Settings
 
 BACKUP_RE = re.compile(r"^invoices-backup-\d{8}-\d{6}\.tar\.gz$")
@@ -64,15 +64,17 @@ def _create_backup(settings: Settings) -> Path:
         try:
             db.init_db(src)
             problems = archive.verify_all(src, settings.archive_dir) \
-                + expenses.verify_all(src, settings.expenses_dir)
+                + expenses.verify_all(src, settings.expenses_dir) + chain.verify_chains(src)
             if problems:
                 raise BackupError(
                     "Archiv inkonsistent, Backup abgebrochen: "
                     + "; ".join(f"{n}: {p}" for n, p in problems)
                 )
             dst = sqlite3.connect(snapshot)
+            dst.row_factory = sqlite3.Row
             try:
                 src.backup(dst)
+                heads = chain.chain_heads(dst)
             finally:
                 dst.close()
         finally:
@@ -84,6 +86,8 @@ def _create_backup(settings: Settings) -> Path:
         manifest = {
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "files": {name: _sha256(p) for name, p in files.items()},
+            # Heads of the log hash chains: a later database must still contain them.
+            "chain_heads": heads,
         }
 
         partial = Path(tmp) / target.name
@@ -150,9 +154,9 @@ def verify_backup(path: Path) -> dict:
     return manifest
 
 
-def restore_backup(path: Path, data_dir: Path) -> None:
-    """Restore a backup into an empty or non-existent data directory."""
-    verify_backup(path)
+def restore_backup(path: Path, data_dir: Path) -> dict:
+    """Restore a backup into an empty or non-existent data directory. Returns its manifest."""
+    manifest = verify_backup(path)
     if data_dir.exists() and any(data_dir.iterdir()):
         raise BackupError(f"{data_dir} ist nicht leer. Restore nur in ein leeres Verzeichnis.")
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -162,6 +166,7 @@ def restore_backup(path: Path, data_dir: Path) -> None:
     for p in (*(data_dir / "archive").rglob("*.pdf"), *(data_dir / "expenses").rglob("*")):
         if p.is_file():
             p.chmod(0o444)
+    return manifest
 
 
 def restore_test(settings: Settings, path: Path) -> str:
@@ -170,11 +175,17 @@ def restore_test(settings: Settings, path: Path) -> str:
     try:
         with tempfile.TemporaryDirectory(prefix="restore-test-") as tmp:
             target = Path(tmp) / "data"
-            restore_backup(path, target)
+            manifest = restore_backup(path, target)
             conn = db.connect(target / "invoices.sqlite3")
             try:
                 problems = archive.verify_all(conn, target / "archive") \
-                    + expenses.verify_all(conn, target / "expenses")
+                    + expenses.verify_all(conn, target / "expenses") + chain.verify_chains(conn)
+                # The live database must still contain what this backup saw.
+                live = db.connect(settings.db_path)
+                try:
+                    problems += chain.compare_heads(live, manifest.get("chain_heads", {}))
+                finally:
+                    live.close()
                 invoices = conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
                 documents = conn.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
             finally:

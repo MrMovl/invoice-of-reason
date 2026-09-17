@@ -25,7 +25,7 @@ from flask import (
     url_for,
 )
 
-from . import archive, auth, backup, db, expenses, system
+from . import archive, auth, backup, chain, db, expenses, system
 from .config import ConfigError, load_sender
 from .pdf import LayoutOverflowError, format_amount, format_date
 
@@ -49,6 +49,7 @@ EVENT_LABELS = {
     "status:open": "Auf offen gesetzt",
     "status:paid": "Als bezahlt markiert",
     "status:cancelled": "Storniert",
+    "sealed": "Versiegelt",
 }
 
 
@@ -498,7 +499,7 @@ def expense_file(expense_id: int):
 def backup_list():
     conn = get_db()
     problems = archive.verify_all(conn, settings().archive_dir) \
-        + expenses.verify_all(conn, settings().expenses_dir)
+        + expenses.verify_all(conn, settings().expenses_dir) + chain.verify_chains(conn)
     count = conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
     expense_count = conn.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
     runs = conn.execute("SELECT * FROM control_runs ORDER BY id DESC LIMIT 20").fetchall()

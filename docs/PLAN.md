@@ -40,6 +40,11 @@ Reachable at `invoices.example.com` behind a login.
 - `system_events`: append-only log of schema migrations, deployed versions and configuration changes
   (sender data, retention). `PRAGMA user_version` counts applied migrations (`db.MIGRATIONS`).
 - `control_runs`: append-only log of verify, backup and restore-test runs with result and version.
+- Hash chain: every row of the four log tables stores `hash` = sha256(previous hash + row content).
+  Invoice and expense events also store `state_hash`, the hash of the record after the change.
+  `verify` recomputes the chains, compares every record with its latest `state_hash` and checks
+  that all protective triggers exist, so dropping a trigger and editing the file is detected.
+  New columns must default to NULL or '' (omitted from hashes) or come with a re-seal migration.
 
 ## Expenses
 

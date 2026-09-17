@@ -15,7 +15,7 @@
   <ul>{% for number, problem in problems %}<li>{{ number }}: {{ problem }}</li>{% endfor %}</ul>
 </div>
 {% else %}
-<p class="flash flash-ok">Alle {{ count }} archivierten Rechnungen und {{ expense_count }} Belege stimmen mit ihren Prüfsummen überein.</p>
+<p class="flash flash-ok">Alle {{ count }} archivierten Rechnungen und {{ expense_count }} Belege stimmen mit ihren Prüfsummen überein, alle Protokolle sind lückenlos verkettet.</p>
 {% endif %}
 
 <p class="lede">Backups laufen automatisch täglich. Jede Datei enthält Datenbank, alle Rechnungen, alle Belege und ein Manifest mit Prüfsummen. Für eine Kopie außerhalb des Servers herunterladen oder per Sync-Tool abholen.</p>

@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import archive, backup, db, expenses, system
+from . import archive, backup, chain, db, expenses, system
 from .config import load_settings
 
 
@@ -38,7 +38,8 @@ def cmd_verify(_args) -> int:
     db.init_db(conn)
     count = conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
     expense_count = conn.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
-    problems = archive.verify_all(conn, s.archive_dir) + expenses.verify_all(conn, s.expenses_dir)
+    problems = archive.verify_all(conn, s.archive_dir) + expenses.verify_all(conn, s.expenses_dir) \
+        + chain.verify_chains(conn)
     for number, problem in problems:
         print(f"FEHLER {number}: {problem}", file=sys.stderr)
     summary = f"{count} Rechnungen und {expense_count} Belege geprüft"

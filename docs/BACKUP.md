@@ -10,7 +10,9 @@ The `backup` service in `docker-compose.yml` runs `invoices backup` once at star
 2. Takes a consistent SQLite snapshot with the online backup API (safe while the app runs).
 3. Writes `backups/invoices-backup-YYYYMMDD-HHMMSS.tar.gz` containing `invoices.sqlite3`,
    `archive/**.pdf`, `expenses/**` (uploaded expense documents) and `manifest.json` (SHA-256 of
-   every file).
+   every file and the heads of the log hash chains). `restore-test` checks that the live database
+   still contains those heads, which reveals removed recent log entries. Off-site copies of the
+   manifests are what makes this an external anchor.
 4. Rotates: keeps the newest `INVOICES_BACKUP_KEEP` (default 30) plus the newest backup of every
    month, forever. At a few hundred KB per month this is negligible for decades.
 

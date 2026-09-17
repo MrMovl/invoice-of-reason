@@ -4,7 +4,11 @@ Uploaded expense documents are equally fixed; only their booking data can be cor
 
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 import sqlite3
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -153,7 +157,7 @@ def connect(db_path: Path) -> sqlite3.Connection:
 # Schema changes after the initial schema. Each entry runs once, in order, inside one
 # transaction, and is recorded in system_events (GoBD Rz. 142: migrations are documented).
 # PRAGMA user_version holds the number of applied migrations. Never edit an applied entry.
-MIGRATIONS: list[tuple[str, str]] = [
+MIGRATIONS: list[tuple[str, str | Callable[[sqlite3.Connection], None]]] = [
     (
         "system_events and control_runs",
         """
@@ -182,6 +186,7 @@ MIGRATIONS: list[tuple[str, str]] = [
         BEGIN SELECT RAISE(ABORT, 'control runs are append-only'); END;
         """,
     ),
+    ("hash chain over all logs", lambda conn: _introduce_hash_chain(conn)),
 ]
 
 
@@ -190,9 +195,15 @@ def schema_version(conn: sqlite3.Connection) -> int:
 
 
 def init_db(conn: sqlite3.Connection) -> None:
+    existing = conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'invoices'").fetchone()
+    missing = missing_triggers(conn) if existing else []
     conn.executescript(SCHEMA)
     conn.commit()
     migrate(conn)
+    if missing:
+        # The schema script has just restored them. Keep a permanent trace (GoBD Rz. 108).
+        with conn:
+            add_system_event(conn, "trigger_missing", ", ".join(missing))
 
 
 def migrate(conn: sqlite3.Connection) -> None:
@@ -205,8 +216,11 @@ def migrate(conn: sqlite3.Connection) -> None:
             if schema_version(conn) >= number:
                 conn.rollback()
                 continue
-            for statement in _statements(sql):
-                conn.execute(statement)
+            if callable(sql):
+                sql(conn)
+            else:
+                for statement in _statements(sql):
+                    conn.execute(statement)
             conn.execute(f"PRAGMA user_version = {number}")
             add_system_event(conn, "schema_migration", f"{number}: {description}")
             conn.commit()
@@ -229,25 +243,122 @@ def _statements(sql: str) -> list[str]:
     return statements
 
 
+# ── Hash chain (GoBD Rz. 110) ──────────────────────────────────────────────
+#
+# Triggers stop accidental changes, but anyone with the database file can drop them. Every log
+# table is therefore a hash chain: each row stores sha256(previous hash + row content). Events on
+# invoices and expenses also store the hash of the record's full state after the change, so a
+# silent UPDATE of a record or an edited, inserted or removed log entry breaks verification.
+# Removing the newest entries is only detectable against a copy of the chain head, which every
+# backup manifest records.
+#
+# Canonical form: JSON of all columns, sorted, with NULL and '' omitted. New columns that default
+# to NULL or '' therefore leave existing hashes valid; other defaults need a re-seal migration.
+
+CHAINED_TABLES = ("events", "expense_events", "system_events", "control_runs")
+RECORD_OF = {"events": ("invoices", "invoice_id"), "expense_events": ("expenses", "expense_id")}
+UNHASHED_RECORD_COLUMNS = ("updated_at",)
+
+
+def canonical(values: dict) -> bytes:
+    kept = {k: v for k, v in values.items() if v is not None and v != ""}
+    return json.dumps(kept, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()
+
+
+def chain_hash(prev_hash: str, row: dict) -> str:
+    content = {k: v for k, v in row.items() if k != "hash"}
+    return hashlib.sha256(prev_hash.encode() + canonical(content)).hexdigest()
+
+
+def record_state_hash(conn: sqlite3.Connection, table: str, record_id: int) -> str:
+    row = conn.execute(f"SELECT * FROM {table} WHERE id = ?", (record_id,)).fetchone()
+    if row is None:
+        return ""
+    state = {k: row[k] for k in row.keys() if k not in UNHASHED_RECORD_COLUMNS}
+    return hashlib.sha256(canonical(state)).hexdigest()
+
+
+def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+
+
+def _append(conn: sqlite3.Connection, table: str, values: dict) -> None:
+    """Insert a log row, chained to the previous one when the table has a hash column."""
+    if not conn.in_transaction:
+        # Take the write lock before reading the chain head, so two processes cannot both
+        # append to the same head.
+        conn.execute("BEGIN IMMEDIATE")
+    columns = _columns(conn, table)
+    if "hash" in columns:
+        if table in RECORD_OF:
+            record_table, ref = RECORD_OF[table]
+            values["state_hash"] = record_state_hash(conn, record_table, values[ref])
+        head = conn.execute(f"SELECT id, hash FROM {table} ORDER BY id DESC LIMIT 1").fetchone()
+        values = {"id": head["id"] + 1 if head else 1, **values}
+        values["hash"] = chain_hash(head["hash"] if head else "", values)
+    names = ", ".join(values)
+    marks = ", ".join("?" for _ in values)
+    conn.execute(f"INSERT INTO {table} ({names}) VALUES ({marks})", tuple(values.values()))
+
+
+def chain_head(conn: sqlite3.Connection, table: str) -> dict:
+    head = conn.execute(f"SELECT id, hash FROM {table} ORDER BY id DESC LIMIT 1").fetchone()
+    return {"id": head["id"], "hash": head["hash"]} if head else {"id": 0, "hash": ""}
+
+
+def _introduce_hash_chain(conn: sqlite3.Connection) -> None:
+    for table in CHAINED_TABLES:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN hash TEXT NOT NULL DEFAULT ''")
+        if table in RECORD_OF:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN state_hash TEXT NOT NULL DEFAULT ''")
+    # Existing entries get their hashes once. Their content is not changed; the append-only
+    # triggers are lifted for this and restored within the same transaction.
+    triggers = {
+        name: sql for name, sql in conn.execute(
+            "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND name IN (?, ?, ?, ?)",
+            ("events_append_only_update", "expense_events_append_only_update",
+             "system_events_append_only_update", "control_runs_append_only_update"))
+    }
+    for name in triggers:
+        conn.execute(f"DROP TRIGGER {name}")
+    for table in CHAINED_TABLES:
+        prev = ""
+        for row in conn.execute(f"SELECT * FROM {table} ORDER BY id").fetchall():
+            values = dict(zip(row.keys(), row)) if isinstance(row, sqlite3.Row) else dict(row)
+            prev = chain_hash(prev, values)
+            conn.execute(f"UPDATE {table} SET hash = ? WHERE id = ?", (prev, values["id"]))
+    for sql in triggers.values():
+        conn.execute(sql)
+    # Seal the current state of every record, so later silent changes are detectable.
+    for (invoice_id,) in conn.execute("SELECT id FROM invoices ORDER BY id").fetchall():
+        add_event(conn, invoice_id, "sealed", "Hash-Kette eingeführt")
+    for (expense_id,) in conn.execute("SELECT id FROM expenses ORDER BY id").fetchall():
+        add_expense_event(conn, expense_id, "sealed", "Hash-Kette eingeführt")
+
+
+def expected_triggers(version: int) -> set[str]:
+    """Names of all protective triggers the schema defines up to a migration version."""
+    scripts = [SCHEMA] + [sql for _desc, sql in MIGRATIONS[:version] if isinstance(sql, str)]
+    pattern = re.compile(r"CREATE TRIGGER (?:IF NOT EXISTS )?(\w+)", re.IGNORECASE)
+    return {name for script in scripts for name in pattern.findall(script)}
+
+
+def missing_triggers(conn: sqlite3.Connection) -> list[str]:
+    present = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'trigger'")}
+    return sorted(expected_triggers(schema_version(conn)) - present)
+
+
 def add_event(conn: sqlite3.Connection, invoice_id: int, action: str, detail: str = "") -> None:
-    conn.execute(
-        "INSERT INTO events (invoice_id, at, action, detail) VALUES (?, ?, ?, ?)",
-        (invoice_id, now_iso(), action, detail),
-    )
+    _append(conn, "events", {"invoice_id": invoice_id, "at": now_iso(), "action": action, "detail": detail})
 
 
 def add_expense_event(conn: sqlite3.Connection, expense_id: int, action: str, detail: str = "") -> None:
-    conn.execute(
-        "INSERT INTO expense_events (expense_id, at, action, detail) VALUES (?, ?, ?, ?)",
-        (expense_id, now_iso(), action, detail),
-    )
+    _append(conn, "expense_events",
+            {"expense_id": expense_id, "at": now_iso(), "action": action, "detail": detail})
 
 
 def add_system_event(conn: sqlite3.Connection, action: str, detail: str = "") -> None:
-    conn.execute(
-        "INSERT INTO system_events (at, action, detail) VALUES (?, ?, ?)",
-        (now_iso(), action, detail),
-    )
+    _append(conn, "system_events", {"at": now_iso(), "action": action, "detail": detail})
 
 
 def last_system_event(conn: sqlite3.Connection, action: str):
@@ -259,7 +370,5 @@ def last_system_event(conn: sqlite3.Connection, action: str):
 def add_control_run(conn: sqlite3.Connection, kind: str, ok: bool, detail: str = "",
                     app_version: str = "") -> None:
     with conn:
-        conn.execute(
-            "INSERT INTO control_runs (at, kind, ok, detail, app_version) VALUES (?, ?, ?, ?, ?)",
-            (now_iso(), kind, int(ok), detail, app_version),
-        )
+        _append(conn, "control_runs", {"at": now_iso(), "kind": kind, "ok": int(ok), "detail": detail,
+                                       "app_version": app_version})
