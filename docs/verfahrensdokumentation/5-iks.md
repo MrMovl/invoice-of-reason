@@ -19,7 +19,7 @@ entsprechend der Unternehmensgröße (Rz. 15).
 | Prüfpflicht | Richtigkeit automatisch gelesener Werte | jeder Beleg | Status „zu prüfen“ bis zum Speichern; Verlaufseintrag `reviewed` |
 | Fristüberwachung | zeitgerechte Erfassung | laufend | Markierung „über 10 Tage ungeprüft“, überfällige Rechnungen |
 | GWG-Hinweis | Anlagegüter nicht als sofort abziehbare Ausgabe erfassen | bei jeder Anzeige eines Belegs mit Betrag über 800 € ohne Markierung | Hinweis im Formular; Entscheidung im Verlauf (`Anlagegut (AfA)`); getrennte Summe in der Übersicht |
-| § 13b-Hinweis | Erkennen von Eingangsleistungen mit Steuerschuldnerschaft des Leistungsempfängers | beim Hochladen, Anzeige bei der Prüfung | Hinweis mit Grund in `suggestion_json`; Entscheidung im Verlauf (`Steuerschuldnerschaft § 13b UStG`) |
+| § 13b-Hinweis | Erkennen von Eingangsleistungen mit Steuerschuldnerschaft des Leistungsempfängers, ohne Fehlalarm bei ausgewiesener Umsatzsteuer | beim Hochladen, Anzeige bei der Prüfung | Prüfung auf ausgewiesene Umsatzsteuer (Satz und Betrag über null); Hinweis mit Grund bzw. neutraler Hinweis auf die ausgewiesene Steuer in `suggestion_json`; Entscheidung im Verlauf (`Steuerschuldnerschaft § 13b UStG`) |
 | § 13b-Übersicht | Vollständigkeit der zu meldenden § 13b-Beträge | laufend auf der Ausgabenseite | Summen je Quartal und Jahr; Abgleich mit der abgegebenen Meldung (5.2) |
 | Pflichtangaben bei Storno/Verwerfen | Nachvollziehbarkeit | bei jeder Stornierung/Verwerfung | Grund im Verlauf |
 | Unveränderbarkeit | Schutz vor Verfälschung | ständig | Trigger, Schreibschutz, Protokoll (Teil 3.3) |

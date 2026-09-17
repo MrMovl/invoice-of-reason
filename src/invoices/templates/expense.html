@@ -72,6 +72,8 @@
       {% endif %}
       {% if suggestion.reverse_charge_hint and form.reverse_charge != '13b' %}
       <p class="flash flash-warn">Möglicherweise § 13b UStG: {{ suggestion.reverse_charge_hint }}. Bitte prüfen; die Umsatzsteuer schuldet dann auch ein Kleinunternehmer (§ 13b Abs. 5 UStG).</p>
+      {% elif suggestion.vat_charged and form.reverse_charge != '13b' %}
+      <p class="hint">Beleg weist Umsatzsteuer aus ({{ suggestion.vat_charged }}) – kein § 13b; ein Reverse-Charge-Satz im Fußtext ist dann nur ein Standardhinweis.</p>
       {% endif %}
       <p class="hint">Typisch bei Leistungen von Unternehmen im Ausland (z. B. Cloud-Dienste, Software, APIs), wenn keine deutsche Umsatzsteuer ausgewiesen ist. Wird nie automatisch gesetzt.</p>
       <label>Notiz
@@ -137,6 +139,7 @@
       <dt>Betrag</dt><dd>{% if not suggestion.amount_cents %}–{% elif suggestion.currency and suggestion.currency != 'EUR' %}{{ (suggestion.amount_cents|eur)[:-2] }} {{ suggestion.currency }}{% else %}{{ suggestion.amount_cents|eur }}{% endif %}</dd>
       <dt>Datum</dt><dd>{{ suggestion.expense_date|de_date or '–' }}</dd>
       <dt>Nummer</dt><dd>{{ suggestion.invoice_number or '–' }}</dd>
+      <dt>Umsatzsteuer im Beleg</dt><dd>{{ suggestion.vat_charged or '–' }}</dd>
       <dt>§ 13b-Hinweis</dt><dd>{{ suggestion.reverse_charge_hint or '–' }}</dd>
     </dl>
     {% if suggestion.credit_note %}

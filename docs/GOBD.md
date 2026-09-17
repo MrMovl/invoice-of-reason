@@ -147,6 +147,7 @@ Programmidentität. Rules that follow:
 | 19 | Capital assets excluded from the expense total | done (`gobd/capital-assets`); register and AfA stay outside |
 | 20 | Turnover limit monitor (§ 19 UStG since 2025) | done (`gobd/turnover-limit`) |
 | 23 | § 13b in foreign currency: conversion hint | done (`gobd/rc-currency`) |
+| 24 | § 13b hint: no false positive when the document charges VAT | done (`fix/reverse-charge-false-positive`) |
 | 22 | External receipts for the § 19 limits | done (`gobd/external-receipts`) |
 | 21 | Hotfix: cancelling a paid invoice erased the receipt | done (`fix/paid-cancellation`); paid → cancelled refused, lost receipts reported |
 | 9 | Cancellation document | done (`gobd/cancellation`), see [CANCELLATION.md](CANCELLATION.md) |

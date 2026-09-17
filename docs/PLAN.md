@@ -108,8 +108,12 @@ are not checked. Only receipts recorded in the tool count.
   review form shows a non-blocking hint when the (gross) amount exceeds `GWG_LIMIT_NET_CENTS`
   (800 € net, § 6 Abs. 2 EStG) and the field is empty. Asset register and AfA stay outside the tool.
 - Reverse charge (§ 13b UStG): `reverse_charge` ('' | '13b') is set by hand when reviewing. At upload
-  `suggestion_json.reverse_charge_hint` records why it may apply (e-invoice VAT category AE, seller
-  country ≠ DE, or wording such as "reverse charge" in the PDF text); it is shown, never applied.
+  `expenses.charged_vat` first checks whether the document charges VAT (e-invoice tax total > 0 or
+  category S with a rate > 0; a VAT line with rate and amount > 0 in the PDF text). If it does, the
+  amount is recorded in `suggestion_json.vat_charged` and there is no § 13b hint, because a supplier
+  abroad may charge German VAT (OSS) and still print conditional reverse charge boilerplate.
+  Otherwise `suggestion_json.reverse_charge_hint` records why it may apply (e-invoice VAT category
+  AE, seller country ≠ DE, wording such as "reverse charge"); it is shown, never applied.
   The expenses page sums marked, non-void expenses per quarter of the selected year by invoice
   date as the tax base, with 19 % as a labelled orientation value. Filter "Nur § 13b UStG".
   For an invoice in a foreign currency the review form points to the monthly average rate published

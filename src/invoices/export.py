@@ -86,7 +86,7 @@ DESCRIPTIONS = {
     "doc_type": "Dateityp des Belegs: pdf, jpg, png oder xml (E-Rechnung XRechnung/UBL/CII)",
     "original_filename": "Ursprünglicher Dateiname beim Hochladen",
     "doc_text": "Textebene der PDF bzw. lesbare Fassung der E-Rechnung (für die Suche)",
-    "suggestion_json": "Beim Hochladen aus dem Beleg gelesene Werte (JSON), mit Quelle: xml, zugferd, text oder none",
+    "suggestion_json": "Beim Hochladen aus dem Beleg gelesene Werte (JSON), mit Quelle (xml, zugferd, text, none), ggf. ausgewiesener Umsatzsteuer und § 13b-Hinweis",
     "kind": "Art der Kontrolle",
     "ok": "Ergebnis (1 = erfolgreich, 0 = fehlgeschlagen)",
     "app_version": "Programmversion",

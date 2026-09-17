@@ -110,11 +110,16 @@ Freitext zu einer Rechnung. Jede Änderung wird mit altem und neuem Text protoko
    - Sonstiges PDF mit Textebene: Werte aus dem Text (heuristisch).
    - Scan oder Foto ohne Text: keine Vorschläge.
    Die Quelle wird unter „Automatisch erkannt“ angezeigt.
-4. Hinweis auf § 13b UStG: Das Programm merkt einen möglichen Fall der Steuerschuldnerschaft des
-   Leistungsempfängers vor, wenn eine E-Rechnung die Steuerkategorie AE enthält, der
-   Rechnungssteller laut E-Rechnung nicht in Deutschland sitzt oder der Belegtext Formulierungen
-   wie „Reverse charge“ oder „Steuerschuldnerschaft des Leistungsempfängers“ enthält. Der Hinweis
-   wird bei der Prüfung angezeigt; das Feld selbst wird nie automatisch gesetzt.
+4. Hinweis auf § 13b UStG: Das Programm prüft zuerst, ob der Beleg Umsatzsteuer ausweist (in einer
+   E-Rechnung ein Steuerbetrag über null oder die Kategorie S mit einem Satz über null, im Text
+   eine Umsatzsteuerzeile mit Satz und Betrag über null). **Weist der Beleg Umsatzsteuer aus, gibt
+   es keinen § 13b-Hinweis**, auch wenn der Rechnungssteller im Ausland sitzt oder im Fußtext ein
+   Reverse-Charge-Satz steht; stattdessen erscheint ein neutraler Hinweis auf die ausgewiesene
+   Steuer. Weist der Beleg keine Umsatzsteuer aus, merkt das Programm einen möglichen Fall vor,
+   wenn eine E-Rechnung die Steuerkategorie AE enthält, der Rechnungssteller laut E-Rechnung nicht
+   in Deutschland sitzt oder der Belegtext Formulierungen wie „Reverse charge“ oder
+   „Steuerschuldnerschaft des Leistungsempfängers“ enthält. Das Feld selbst wird nie automatisch
+   gesetzt.
 5. Der Beleg hat den Hinweis „Zu prüfen“, bis er einmal gespeichert wurde.
 
 ## 2.6 Beleg prüfen und kontieren
@@ -139,6 +144,10 @@ eintragen, dann „Geprüft, speichern“. „Speichern und nächster“ führt 
   Leistungen von Unternehmen im Ausland (Cloud-Dienste, Software, APIs). Das gilt auch für
   Kleinunternehmer (§ 13b Abs. 5 UStG). Ob ein Fall vorliegt, entscheidet der Unternehmer; ein
   Hinweis aus dem Hochladen (2.5) ist nur ein Anlass zur Prüfung. Änderungen werden protokolliert.
+  **Faustregel:** Steht auf dem Beleg eine Umsatzsteuer mit Satz und Betrag, ist es kein § 13b-Fall
+  — ein Anbieter im Ausland kann deutsche Umsatzsteuer berechnen (Behandlung als Privatkunde, OSS)
+  und trotzdem einen allgemeinen Reverse-Charge-Satz im Fußtext drucken. Nur wenn keine
+  Umsatzsteuer ausgewiesen ist, kommt § 13b in Betracht.
 - **Fremdwährung bei § 13b UStG:** Ist die Rechnung nicht in Euro ausgestellt und als § 13b
   markiert (oder als solche vorgemerkt), weist das Formular darauf hin, dass die
   Bemessungsgrundlage mit dem vom BMF veröffentlichten monatlichen Durchschnittskurs umzurechnen ist
