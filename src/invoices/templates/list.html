@@ -33,10 +33,12 @@
 
 <section class="cash" aria-labelledby="cash-head">
   <h2 id="cash-head">Einnahmen und Ausgaben {{ cash.year or 'gesamt' }} <small>nach Zahlungsdatum</small></h2>
+  <p class="hint">Ausgaben ohne Anlagegüter. Anlagegüter werden über die Nutzungsdauer abgeschrieben (AfA); Anlagenverzeichnis und AfA werden außerhalb des Programms geführt, der Überschuss ist deshalb vor AfA.</p>
   <dl class="stats">
     <div><dt>Einnahmen</dt><dd>{{ cash.income|eur }}</dd></div>
     <div><dt>Ausgaben</dt><dd><a href="{{ url_for('web.expense_list', year=cash.year or None, status='paid') }}">{{ cash.expenses|eur }}</a></dd></div>
-    <div><dt>Überschuss</dt><dd class="{{ 'negative' if cash.surplus < 0 }}">{{ cash.surplus|eur }}</dd></div>
+    {% if cash.assets %}<div><dt>Anlagegüter <small>(nicht abgezogen)</small></dt><dd><a href="{{ url_for('web.expense_list', year=cash.year or None, asset=1) }}">{{ cash.assets|eur }}</a></dd></div>{% endif %}
+    <div><dt>Überschuss vor AfA</dt><dd class="{{ 'negative' if cash.surplus_before_afa < 0 }}">{{ cash.surplus_before_afa|eur }}</dd></div>
     {% if cash.to_review %}<div><dt>Belege zu prüfen</dt><dd><a href="{{ url_for('web.expense_list', review=1) }}">{{ cash.to_review }}</a></dd></div>{% endif %}
   </dl>
 </section>

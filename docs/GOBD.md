@@ -144,7 +144,7 @@ Programmidentität. Rules that follow:
 | 16 | § 19 note in the 2025 wording (§ 34a Nr. 5 UStDV) | done (`fix/small-business-note`); invoices created before keep the old sentence |
 | 17 | Docs: GoBD second amendment (BMF 14.07.2025), retention since BEG IV | done (`gobd/legal-state-2025`); no code change needed |
 | 18 | Reverse charge flag on expenses (§ 13b UStG) | done (`gobd/reverse-charge`) |
-| 19 | Capital assets excluded from the expense total | open |
+| 19 | Capital assets excluded from the expense total | done (`gobd/capital-assets`); register and AfA stay outside |
 | 20 | Turnover limit monitor (§ 19 UStG since 2025) | open |
 | 9 | Cancellation document | design proposal pending |
 
@@ -159,6 +159,12 @@ kept privately outside this repository.
 2. **§ 13b timing.** The tax arises with the end of the period in which the service was performed.
    The tool assigns a purchase to a quarter by its invoice date, as it does not record the service
    period. Is that acceptable, or does the service period need its own field? (#18)
+3. **Assets between 250 € and 1,000 €.** The tool only knows "asset" or "immediately deductible" with
+   the 800 € GWG limit. Should the Sammelposten option (§ 6 Abs. 2a EStG) be supported, and how
+   should depreciable assets below the limit that are deliberately depreciated be marked? (#19)
+4. **Asset hint on gross amounts.** The hint compares the gross amount with the 800 € net limit, so
+   it also appears for net prices between about 673 € and 800 € (at 19 % VAT). Is a net amount field
+   worth adding? (#19)
 
 ## Order
 

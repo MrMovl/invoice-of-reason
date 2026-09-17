@@ -390,9 +390,13 @@ def expense_list():
     category = request.args.get("category", "")
     review = request.args.get("review", "")
     rc = request.args.get("rc", "")
+    asset = request.args.get("asset", "")
     q = request.args.get("q", "").strip()
 
     where, params = [], []
+    if asset:
+        where.append("treatment = ?")
+        params.append(expenses.ASSET)
     if rc:
         where.append("reverse_charge = ?")
         params.append(expenses.REVERSE_CHARGE)
@@ -425,7 +429,7 @@ def expense_list():
     late = {r["id"] for r in rows if expenses.review_overdue(r)}
     return render_template("expenses.html", rows=rows, years=years, year=year, status=status,
                            category=category, categories=_categories(conn), review=review,
-                           q=q, totals=totals, late=late, review_days=expenses.REVIEW_DAYS, rc=rc,
+                           q=q, totals=totals, late=late, review_days=expenses.REVIEW_DAYS, rc=rc, asset=asset,
                            rc_summary=expenses.reverse_charge_summary(
                                conn, int(year) if re.fullmatch(r"\d{4}", year) else date.today().year))
 
@@ -463,6 +467,17 @@ def expense_upload():
     return redirect(url_for("web.expense_list", review=1 if created else None))
 
 
+def _hint_values(form) -> dict:
+    """Stored row or a re-shown form after a failed save: both need amount_cents for the hints."""
+    values = dict(form)
+    if "amount_cents" not in values:
+        try:
+            values["amount_cents"] = int(archive.parse_amount(form.get("amount") or "") * 100)
+        except archive.ArchiveError:
+            values["amount_cents"] = None
+    return values
+
+
 def _get_expense(expense_id: int):
     row = get_db().execute("SELECT * FROM expenses WHERE id = ?", (expense_id,)).fetchone()
     if row is None:
@@ -496,6 +511,8 @@ def expense_detail(expense_id: int, form=None):
         except (OSError, einvoice.EInvoiceError) as e:
             invoice_error = str(e) if isinstance(e, einvoice.EInvoiceError) else "Datei fehlt im Archiv."
     return render_template("expense.html", exp=row, form=form, events=events, problem=problem,
+                           asset_hint=expenses.asset_hint(_hint_values(form)),
+                           gwg_limit=expenses.GWG_LIMIT_NET_CENTS,
                            suggestion=suggestion, suggestion_sources=SUGGESTION_SOURCES,
                            invoice=invoice, invoice_error=invoice_error,
                            review_late=expenses.review_overdue(row), review_days=expenses.REVIEW_DAYS,

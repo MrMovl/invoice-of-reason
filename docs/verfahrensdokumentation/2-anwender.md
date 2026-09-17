@@ -74,6 +74,13 @@ eintragen, dann „Geprüft, speichern“. „Speichern und nächster“ führt 
 - **Zahlungsart:** „Überweisung/Karte“, „Bar“ oder „Privat bezahlt (Einlage)“ für Ausgaben, die aus
   privaten Mitteln bezahlt wurden.
 - **Zahlungsdatum** leer bedeutet: bezahlt am Rechnungsdatum.
+- **Anlagegut (AfA):** ankreuzen, wenn der Beleg ein abnutzbares Wirtschaftsgut betrifft, das nicht
+  sofort abgezogen werden darf, weil der Nettopreis über 800 € liegt (GWG-Grenze, § 6 Abs. 2 EStG).
+  Maßgeblich ist der Nettopreis, auch wenn keine Vorsteuer abgezogen wird. Ist der eingetragene
+  (Brutto-)Betrag höher als 800 € und das Feld leer, zeigt das Formular einen Hinweis; speichern ist
+  trotzdem möglich. Anlagegüter zählen nicht zu den Ausgaben der Übersicht (2.8). Das
+  Anlagenverzeichnis und die Abschreibung werden außerhalb des Programms geführt (§ 4 Abs. 3
+  Satz 5 EStG, Teil 6). Änderungen werden protokolliert.
 - **Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG):** ankreuzen, wenn der Leistende die
   Umsatzsteuer nicht selbst berechnet und sie deshalb der Unternehmer schuldet, typischerweise bei
   Leistungen von Unternehmen im Ausland (Cloud-Dienste, Software, APIs). Das gilt auch für
@@ -98,7 +105,10 @@ Beleg bleibt archiviert und zählt nicht zu den Ausgaben.
 ## 2.8 Auswertungen und Suche
 
 - Rechnungsliste: Filter nach Jahr, Status, Suche in Nummer, Kunde, Leistung; Summen; überfällige
-  Rechnungen markiert; Einnahmen und Ausgaben je Jahr nach Zahlungsdatum.
+  Rechnungen markiert; Einnahmen und Ausgaben je Jahr nach Zahlungsdatum. Als Anlagegut markierte
+  Belege sind nicht in den Ausgaben enthalten, sondern werden getrennt als „Anlagegüter“ gezeigt;
+  der Überschuss heißt deshalb „Überschuss vor AfA“.
+- Ausgabenliste: Filter „Nur Anlagegüter“; markierte Belege tragen das Kennzeichen „Anlagegut“.
 - § 13b UStG (Ausgabenseite): Für das gewählte Jahr (ohne Auswahl das laufende) je Quartal und für
   das Jahr die Summe der als § 13b markierten, nicht verworfenen Belege als Bemessungsgrundlage,
   zugeordnet nach Rechnungsdatum als Näherung für den Leistungszeitraum, dazu 19 % als
