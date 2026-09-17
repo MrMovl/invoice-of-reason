@@ -7,7 +7,7 @@ from datetime import timedelta
 
 from flask import Flask, g
 
-from . import db
+from . import db, system
 from .config import load_settings
 
 
@@ -41,6 +41,7 @@ def create_app(overrides: dict | None = None) -> Flask:
     settings = app.config["SETTINGS"]
     conn = db.connect(settings.db_path)
     db.init_db(conn)
+    system.record_runtime(conn, settings)
     conn.close()
     settings.archive_dir.mkdir(parents=True, exist_ok=True)
     settings.expenses_dir.mkdir(parents=True, exist_ok=True)

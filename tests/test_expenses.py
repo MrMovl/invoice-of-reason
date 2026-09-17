@@ -48,6 +48,8 @@ def test_upload_rejects_duplicates_and_unknown_types(store):
         upload(s, conn, PNG, "nochmal.png")
     assert e.value.expense_id == exp_id
     with pytest.raises(archive.ArchiveError, match="Nur PDF"):
+        upload(s, conn, b"GIF89a", "x.gif")
+    with pytest.raises(archive.ArchiveError, match="nicht wohlgeformt"):
         upload(s, conn, b"<html>", "x.html")
     row = conn.execute("SELECT * FROM expenses").fetchone()
     assert row["amount_cents"] is None and row["doc_text"] == ""
@@ -58,7 +60,8 @@ def test_review_update_logs_changes_and_document_stays_fixed(store):
     s, conn = store
     exp_id = upload(s, conn, PNG)
     form = {"vendor": "Bauhaus", "amount": "49,99", "expense_date": "2026-09-10", "status": "paid",
-            "category": "Werkzeug", "paid_date": "", "invoice_number": "", "notes": ""}
+            "category": "Werkzeug", "paid_date": "", "invoice_number": "", "notes": "",
+            "payment_method": "bank"}
     expenses.update_expense(conn, exp_id, expenses.parse_expense_form(form))
     row = conn.execute("SELECT * FROM expenses WHERE id = ?", (exp_id,)).fetchone()
     assert (row["amount_cents"], row["reviewed"], row["category"]) == (4999, 1, "Werkzeug")
@@ -81,11 +84,12 @@ def test_cash_summary_by_payment_date(store):
 
     inv = archive.issue_invoice(conn, s.archive_dir, archive.parse_invoice_form(invoice_form()),
                                 load_sender(s.sender_file), s.retention_years)
-    archive.set_status(conn, inv, "paid", date(2027, 1, 5))
+    archive.set_status(conn, inv, "paid", date(2027, 1, 5), payment_method="bank")
     a = upload(s, conn, PNG)
     b = upload(s, conn, PNG + b"b")
     c = upload(s, conn, PNG + b"c")
-    base = {"vendor": "V", "expense_date": "2026-12-20", "paid_date": ""}
+    base = {"vendor": "V", "expense_date": "2026-12-20", "paid_date": "", "category": "Büro",
+            "payment_method": "bank"}
     expenses.update_expense(conn, a, expenses.parse_expense_form({**base, "amount": "100", "status": "paid"}))
     expenses.update_expense(conn, b, expenses.parse_expense_form({**base, "amount": "30", "status": "paid", "paid_date": "2027-01-02"}))
     expenses.update_expense(conn, c, expenses.parse_expense_form({**base, "amount": "999", "status": "open"}))

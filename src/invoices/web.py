@@ -25,14 +25,26 @@ from flask import (
     url_for,
 )
 
-from . import archive, auth, backup, db, expenses
+from . import archive, auth, backup, chain, db, einvoice, expenses, export, system
 from .config import ConfigError, load_sender
 from .pdf import LayoutOverflowError, format_amount, format_date
 
 bp = Blueprint("web", __name__)
 
 STATUS_LABELS = {"open": "Offen", "paid": "Bezahlt", "cancelled": "Storniert"}
+SUGGESTION_SOURCES = {
+    "xml": "E-Rechnung (XML)",
+    "zugferd": "ZUGFeRD/Factur-X (XML im PDF)",
+    "text": "PDF-Text",
+    "none": "–",
+}
 EXPENSE_STATUS_LABELS = {"paid": "Bezahlt", "open": "Offen", "void": "Verworfen"}
+CONTROL_LABELS = {
+    "verify": "Integritätsprüfung",
+    "backup": "Backup",
+    "restore_test": "Wiederherstellungstest",
+    "export": "Datenexport",
+}
 EVENT_LABELS = {
     "created": "Erstellt",
     "uploaded": "Hochgeladen",
@@ -43,6 +55,7 @@ EVENT_LABELS = {
     "status:open": "Auf offen gesetzt",
     "status:paid": "Als bezahlt markiert",
     "status:cancelled": "Storniert",
+    "sealed": "Versiegelt",
 }
 
 
@@ -64,6 +77,20 @@ def eur_filter(cents: int) -> str:
 @bp.app_template_filter("de_date")
 def de_date_filter(iso: str | None) -> str:
     return format_date(date.fromisoformat(iso)) if iso else ""
+
+
+@bp.app_template_filter("money")
+def money_filter(amount: Decimal | None, currency: str = "EUR") -> str:
+    """E-invoice amounts: euro as usual, other currencies with their ISO code."""
+    if amount is None:
+        return "–"
+    text = format_amount(amount)
+    return text if currency in ("EUR", "") else f"{text[:-2]} {currency}"
+
+
+@bp.app_template_filter("de_num")
+def de_num_filter(value: Decimal | None) -> str:
+    return f"{value.normalize():f}".replace(".", ",") if value is not None else ""
 
 
 @bp.app_template_filter("event_label")
@@ -97,7 +124,9 @@ def inject_globals():
         "csrf_token": auth.csrf_token,
         "status_labels": STATUS_LABELS,
         "expense_status_labels": EXPENSE_STATUS_LABELS,
+        "payment_labels": archive.PAYMENT_METHODS,
         "current_user": session.get("user"),
+        "app_version": system.app_version(),
     }
 
 
@@ -210,7 +239,8 @@ def invoice_list():
     }
     return render_template("list.html", rows=rows, years=years, year=year, status=status,
                            q=q, totals=totals, today=today,
-                           cash=expenses.cash_summary(conn, year))
+                           cash=expenses.cash_summary(conn, year),
+                           number_findings=archive.number_findings(conn))
 
 
 def _customers(conn):
@@ -276,6 +306,8 @@ def invoice_create():
     s = settings()
     try:
         inp = archive.parse_invoice_form(request.form)
+        # sender.toml can change without a restart: log it before it shapes a new invoice.
+        system.record_config(conn, s)
         invoice_id = archive.issue_invoice(conn, s.archive_dir, inp, _load_sender(), s.retention_years)
     except (archive.ArchiveError, LayoutOverflowError) as e:
         flash(str(e), "error")
@@ -322,7 +354,8 @@ def invoice_status(invoice_id: int):
         paid = None
         if status == "paid":
             paid = archive.parse_date(request.form.get("paid_date"), "Zahlungsdatum")
-        archive.set_status(get_db(), invoice_id, status, paid, request.form.get("note", ""))
+        archive.set_status(get_db(), invoice_id, status, paid, request.form.get("note", ""),
+                           request.form.get("payment_method", ""))
         flash(f"Status: {STATUS_LABELS[status]}.", "ok")
     except archive.ArchiveError as e:
         flash(str(e), "error")
@@ -333,8 +366,11 @@ def invoice_status(invoice_id: int):
 @auth.login_required
 def invoice_notes(invoice_id: int):
     _get_invoice(invoice_id)
-    archive.set_notes(get_db(), invoice_id, request.form.get("notes", ""))
-    flash("Notiz gespeichert.", "ok")
+    try:
+        archive.set_notes(get_db(), invoice_id, request.form.get("notes", ""))
+        flash("Notiz gespeichert.", "ok")
+    except archive.ArchiveError as e:
+        flash(str(e), "error")
     return redirect(url_for("web.invoice_detail", invoice_id=invoice_id))
 
 
@@ -381,9 +417,10 @@ def expense_list():
         "open": sum(r["amount_cents"] or 0 for r in rows if r["status"] == "open"),
         "to_review": sum(1 for r in rows if not r["reviewed"] and r["status"] != "void"),
     }
+    late = {r["id"] for r in rows if expenses.review_overdue(r)}
     return render_template("expenses.html", rows=rows, years=years, year=year, status=status,
                            category=category, categories=_categories(conn), review=review,
-                           q=q, totals=totals)
+                           q=q, totals=totals, late=late, review_days=expenses.REVIEW_DAYS)
 
 
 def _categories(conn) -> list[str]:
@@ -442,8 +479,19 @@ def expense_detail(expense_id: int, form=None):
         (expense_id,)).fetchone()
     suggestion = json.loads(row["suggestion_json"])
     suggestion["amount_cents"] = int(Decimal(suggestion["amount"]) * 100) if suggestion["amount"] else None
+    # Uploads before e-invoice support recorded no source.
+    suggestion.setdefault("source", "text" if suggestion.get("text_layer") else "none")
+    invoice, invoice_error = None, None
+    if row["doc_type"] == "xml":
+        # Readable view (GoBD Rz. 156): rendered from the archived XML itself, not from stored copies.
+        try:
+            invoice = einvoice.parse((settings().expenses_dir / row["doc_path"]).read_bytes())
+        except (OSError, einvoice.EInvoiceError) as e:
+            invoice_error = str(e) if isinstance(e, einvoice.EInvoiceError) else "Datei fehlt im Archiv."
     return render_template("expense.html", exp=row, form=form, events=events, problem=problem,
-                           suggestion=suggestion,
+                           suggestion=suggestion, suggestion_sources=SUGGESTION_SOURCES,
+                           invoice=invoice, invoice_error=invoice_error,
+                           review_late=expenses.review_overdue(row), review_days=expenses.REVIEW_DAYS,
                            categories=_categories(conn), next_review=next_review,
                            today=date.today().isoformat())
 
@@ -474,8 +522,15 @@ def expense_file(expense_id: int):
     path = settings().expenses_dir / row["doc_path"]
     if not path.is_file():
         abort(404, "Datei fehlt im Archiv.")
+    inline = bool(request.args.get("inline"))
+    if inline and row["doc_type"] == "xml":
+        # Shown as source text: a browser must never render uploaded XML (XSLT, XHTML scripts).
+        resp = send_file(path, mimetype="text/plain", as_attachment=False,  # werkzeug adds charset=utf-8
+                         download_name=Path(row["doc_path"]).name)
+        resp.headers["Content-Security-Policy"] = "sandbox; default-src 'none'"
+        return resp
     return send_file(path, mimetype=expenses.mimetype(row["doc_type"]),
-                     as_attachment=not request.args.get("inline"), download_name=Path(row["doc_path"]).name)
+                     as_attachment=not inline, download_name=Path(row["doc_path"]).name)
 
 
 # ── Backups ───────────────────────────────────────────────────────────────
@@ -486,11 +541,14 @@ def expense_file(expense_id: int):
 def backup_list():
     conn = get_db()
     problems = archive.verify_all(conn, settings().archive_dir) \
-        + expenses.verify_all(conn, settings().expenses_dir)
+        + expenses.verify_all(conn, settings().expenses_dir) + chain.verify_chains(conn)
     count = conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
     expense_count = conn.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
+    runs = conn.execute("SELECT * FROM control_runs ORDER BY id DESC LIMIT 20").fetchall()
     return render_template("backups.html", backups=backup.list_backups(settings()),
-                           problems=problems, count=count, expense_count=expense_count)
+                           problems=problems, count=count, expense_count=expense_count, runs=runs,
+                           control_labels=CONTROL_LABELS, exports=export.list_exports(settings()),
+                           export_years=export.export_years(conn))
 
 
 @bp.post("/backups")
@@ -513,6 +571,28 @@ def backup_download(name: str):
     if not path.is_file():
         abort(404)
     return send_file(path, mimetype="application/gzip", as_attachment=True, download_name=name)
+
+
+@bp.post("/backups/exports")
+@auth.login_required
+def export_create():
+    try:
+        path = export.create_export(settings(), request.form.get("year") or None)
+        flash(f"Datenexport erstellt: {path.name}", "ok")
+    except export.ExportError as e:
+        flash(str(e), "error")
+    return redirect(url_for("web.backup_list"))
+
+
+@bp.get("/backups/exports/<name>")
+@auth.login_required
+def export_download(name: str):
+    if not export.EXPORT_RE.match(name):
+        abort(404)
+    path = settings().backup_dir / "exports" / name
+    if not path.is_file():
+        abort(404)
+    return send_file(path, mimetype="application/zip", as_attachment=True, download_name=name)
 
 
 @bp.app_errorhandler(400)

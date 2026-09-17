@@ -29,7 +29,7 @@ Reachable at `invoices.example.com` behind a login.
 
 - `invoices`: one row per invoice. Identity fields (number, dates, customer, amount, PDF path and
   SHA-256, input snapshot incl. sender data) are protected by SQLite triggers: no UPDATE, no DELETE.
-  Only `status`, `paid_date`, `notes` can change.
+  Only `status`, `paid_date`, `payment_method`, `notes` can change.
 - `events`: append-only audit log (created, imported, status changes, notes).
 - `expenses`: one row per uploaded document (received invoice, receipt). The document itself
   (path, SHA-256, size, type, original filename, extracted text, original suggestion) is immutable
@@ -37,17 +37,39 @@ Reachable at `invoices.example.com` behind a login.
   paid/open/void, paid date, notes) stays correctable; `reviewed` flips to 1 on the first save.
   Wrong uploads are set to "Verworfen" (void) instead of deleted.
 - `expense_events`: append-only log of uploads and every change with old -> new values.
+- `system_events`: append-only log of schema migrations, deployed versions and configuration changes
+  (sender data, retention). `PRAGMA user_version` counts applied migrations (`db.MIGRATIONS`).
+- `control_runs`: append-only log of verify, backup and restore-test runs with result and version.
+- Hash chain: every row of the four log tables stores `hash` = sha256(previous hash + row content).
+  Invoice and expense events also store `state_hash`, the hash of the record after the change.
+  `verify` recomputes the chains, compares every record with its latest `state_hash` and checks
+  that all protective triggers exist, so dropping a trigger and editing the file is detected.
+  New columns must default to NULL or '' (omitted from hashes) or come with a re-seal migration.
 
 ## Expenses
 
-- Upload one or many PDF/JPEG/PNG files (max. 20 MB each). Identical files are rejected by hash.
+- Upload one or many PDF/JPEG/PNG files or XML e-invoices (max. 20 MB each). Identical files are
+  rejected by hash. The type is detected from the content, not the file name.
 - Documents go to `data/expenses/<upload year>/<YYYYMMDD>_<original name>_<sha8>.<ext>`, same
   write-once rules as invoice PDFs.
 - PDFs with a text layer are read with `pdftotext -layout` (first 5 pages). `extract.py` suggests
   vendor (legal form like GmbH, else first line), invoice number, invoice date and the gross total
   (labelled totals like "Gesamtbetrag"/"Zahlbetrag" win, net/VAT lines are skipped, else the largest
   amount with a currency). Scans and photos get no suggestion. No OCR, nothing leaves the server.
+- E-invoices (`einvoice.py`): XRechnung/EN 16931 XML in UBL 2.1 (Invoice, CreditNote) or CII is
+  archived byte for byte (`doc_type = 'xml'`); anything else that looks like XML is rejected, as is
+  XML with DOCTYPE/ENTITY declarations. Seller, number, date and payable amount become the
+  suggestion (other currencies are not prefilled; credit notes are flagged, amount stays positive).
+  The detail page renders the invoice (parties, dates, lines, totals) from the archived XML; "XML
+  ansehen" serves the raw file as `text/plain`, never as renderable XML. `doc_text` holds a plain
+  text rendering for search.
+- ZUGFeRD/Factur-X PDFs: `pdfdetach` looks for an attached `factur-x.xml`, `zugferd-invoice.xml` or
+  `xrechnung.xml`; its values win over the text-layer heuristics. The PDF stays the archived
+  document. `suggestion_json.source` records `xml`, `zugferd`, `text` or `none`.
 - Every upload stays "zu prüfen" until saved once; "Speichern und nächster" walks the review queue.
+  Uploads unreviewed for more than 10 days are marked "über 10 Tage ungeprüft" (GoBD Rz. 47).
+- Saving requires a category, and for paid expenses a payment method (bank/card, cash, paid
+  privately), unless the expense is voided (GoBD Rz. 50, 79).
 - Overview on the archive page: income (paid invoices) vs. expenses (paid expenses) by payment date,
   per selected year, which matches the cash basis of an EÜR. An expense without a paid date counts
   on its invoice date.
@@ -62,6 +84,15 @@ Reachable at `invoices.example.com` behind a login.
   Note: since 2025 the statutory period for Buchungsbelege such as outgoing invoices is 8 years
   (BEG IV); 10 years is the safer default you asked for. Nothing is deleted automatically.
 - Cancelled invoices stay in the archive with status "Storniert" and a reason.
+- Invoice numbers follow `YYYY-NNN` without gaps. The archive page lists gaps, numbers outside the
+  scheme and numbers whose year differs from the issue date (`archive.number_gaps`). Creating an
+  invoice that would add such a finding needs "Abweichende Nummer bewusst verwenden" plus a reason,
+  which is logged in the `created` event.
+- Marking an invoice paid requires the payment method; setting it back clears it (logged).
+
+## GoBD
+
+See [GOBD.md](GOBD.md) for the gap analysis against the GoBD and the resulting work plan.
 
 ## Backups
 
@@ -85,16 +116,18 @@ Done in v0.1:
   "use as template", Leistungszeitraum, configurable Zahlungsziel.
 - Archive list with year/status/search filters, totals, overdue marker.
 - Detail page: download/view, mark paid/open/cancelled, notes, integrity status, history.
-- Invoices only enter the archive through the create form. The first invoice 2026-001, made
-  before the tool existed, was archived once from its original PDF (source "imported").
+- Invoices enter the archive through the create form. Invoices issued before the tool existed are
+  archived from their original PDF with the `invoices import-invoice` CLI (source "imported"): no
+  web route, reason required, number and amount cross-checked with the PDF text, typed
+  confirmation, same write-once rules and hash chain as created invoices.
 - Backups: automatic daily, manual button, download, rotation, verify, restore CLI.
-- Expenses: upload, text-layer suggestions, review queue, categories, search in document text,
+- Expenses: upload, text-layer and e-invoice (XRechnung, ZUGFeRD) suggestions, review queue, categories, search in document text,
   income/expense summary. Included in verify and backups.
 
 Later (not built):
 - Off-site backup target (decide: see BACKUP.md options).
 - Multiple line items, VAT (Regelbesteuerung) once no longer Kleinunternehmer.
-- E-invoice formats (ZUGFeRD/XRechnung). B2B e-invoicing obligations apply to
-  Kleinunternehmer for receiving only; issuing stays optional for them.
+- Issuing e-invoices (ZUGFeRD/XRechnung). B2B e-invoicing obligations apply to
+  Kleinunternehmer for receiving only (done); issuing stays optional for them.
 - Sending invoices by email.
 - OCR for scanned expense receipts (tesseract), expense export for the EÜR (Anlage EÜR lines).

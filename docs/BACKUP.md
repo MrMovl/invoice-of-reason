@@ -10,7 +10,9 @@ The `backup` service in `docker-compose.yml` runs `invoices backup` once at star
 2. Takes a consistent SQLite snapshot with the online backup API (safe while the app runs).
 3. Writes `backups/invoices-backup-YYYYMMDD-HHMMSS.tar.gz` containing `invoices.sqlite3`,
    `archive/**.pdf`, `expenses/**` (uploaded expense documents) and `manifest.json` (SHA-256 of
-   every file).
+   every file and the heads of the log hash chains). `restore-test` checks that the live database
+   still contains those heads, which reveals removed recent log entries. Off-site copies of the
+   manifests are what makes this an external anchor.
 4. Rotates: keeps the newest `INVOICES_BACKUP_KEEP` (default 30) plus the newest backup of every
    month, forever. At a few hundred KB per month this is negligible for decades.
 
@@ -48,4 +50,11 @@ can be added later without touching the app:
 | USB disk on the Pi | cron | Protects against SD card death, not against theft/fire. |
 
 Whichever is chosen: keep at least one copy outside the house, and test a restore once a year
-(`invoices verify-backup` on the off-site copy).
+with `invoices restore-test <file>` on the off-site copy. It restores into a temporary directory,
+verifies every document against the restored database and records the result in the control log.
+
+## Control log
+
+Every `verify`, backup (automatic, manual, failed) and `restore-test` run is written to the
+append-only `control_runs` table and listed on the Backups page (GoBD Rz. 100: controls are
+performed and logged).

@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import archive, backup, db, expenses
+from . import archive, backup, chain, db, expenses, export, system
 from .config import load_settings
 
 
@@ -38,11 +38,17 @@ def cmd_verify(_args) -> int:
     db.init_db(conn)
     count = conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
     expense_count = conn.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
-    problems = archive.verify_all(conn, s.archive_dir) + expenses.verify_all(conn, s.expenses_dir)
+    problems = archive.verify_all(conn, s.archive_dir) + expenses.verify_all(conn, s.expenses_dir) \
+        + chain.verify_chains(conn)
     for number, problem in problems:
         print(f"FEHLER {number}: {problem}", file=sys.stderr)
-    if not problems:
-        print(f"OK: {count} Rechnungen und {expense_count} Belege geprüft.")
+    summary = f"{count} Rechnungen und {expense_count} Belege geprüft"
+    if problems:
+        system.control_run(conn, "verify", False, "; ".join(f"{n}: {p}" for n, p in problems))
+    else:
+        system.control_run(conn, "verify", True, summary)
+        print(f"OK: {summary}.")
+    conn.close()
     return 1 if problems else 0
 
 
@@ -84,6 +90,64 @@ def cmd_restore(args) -> int:
     return 0
 
 
+def cmd_import_invoice(args) -> int:
+    """Archive an invoice PDF issued before this program existed. Irreversible: asks first."""
+    from . import invoice_import
+
+    s = load_settings()
+    path = Path(args.pdf)
+    try:
+        pdf = path.read_bytes()
+        inp = invoice_import.parse_import({**vars(args), "original_filename": path.name})
+    except (OSError, archive.ArchiveError) as e:
+        print(f"FEHLER: {e}", file=sys.stderr)
+        return 1
+    warnings = invoice_import.check_pdf(pdf, inp)
+    print(invoice_import.summary(inp, warnings))
+    print("\nDie Rechnung wird unveränderbar archiviert und kann nicht gelöscht oder geändert werden.")
+    if warnings and not args.accept_warnings:
+        print("Import abgebrochen: Hinweise prüfen und mit --accept-warnings bestätigen.", file=sys.stderr)
+        return 1
+    if not args.yes and input("Importieren? Zum Bestätigen die Rechnungsnummer eingeben: ").strip() != inp.number:
+        print("Import abgebrochen.", file=sys.stderr)
+        return 1
+    conn = db.connect(s.db_path)
+    try:
+        db.init_db(conn)
+        invoice_id = invoice_import.import_invoice(conn, s.archive_dir, pdf, inp, s.retention_years,
+                                                   accepted_warnings=warnings)
+        problems = archive.verify_all(conn, s.archive_dir) + chain.verify_chains(conn)
+    except archive.ArchiveError as e:
+        print(f"FEHLER: {e}", file=sys.stderr)
+        return 1
+    finally:
+        conn.close()
+    print(f"OK: Rechnung {inp.number} importiert (id {invoice_id}).")
+    for where, problem in problems:
+        print(f"WARNUNG {where}: {problem}", file=sys.stderr)
+    return 0
+
+
+def cmd_restore_test(args) -> int:
+    try:
+        summary = backup.restore_test(load_settings(), Path(args.file))
+    except backup.BackupError as e:
+        print(f"FEHLER: {e}", file=sys.stderr)
+        return 1
+    print(f"OK: {summary}.")
+    return 0
+
+
+def cmd_export(args) -> int:
+    try:
+        path = export.create_export(load_settings(), args.year)
+    except (export.ExportError, OSError) as e:
+        print(f"FEHLER: {e}", file=sys.stderr)
+        return 1
+    print(path)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="invoices")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -96,6 +160,29 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("verify-backup", help="Backup-Datei gegen ihr Manifest prüfen")
     p.add_argument("file")
     p.set_defaults(func=cmd_verify_backup)
+    p = sub.add_parser("import-invoice", help="Vor dem Programm erstellte Rechnung (PDF) unverändert archivieren")
+    p.add_argument("pdf", help="Original-PDF, wie versandt")
+    p.add_argument("--number", required=True, help="Rechnungsnummer, z. B. 2026-001")
+    p.add_argument("--issue-date", dest="issue_date", required=True, help="Rechnungsdatum JJJJ-MM-TT")
+    p.add_argument("--service-date", dest="service_date", required=True, help="Leistungsdatum wie gedruckt")
+    p.add_argument("--due-date", dest="due_date", help="Fälligkeitsdatum JJJJ-MM-TT")
+    p.add_argument("--customer-name", dest="customer_name", required=True)
+    p.add_argument("--customer-street", dest="customer_street", default="")
+    p.add_argument("--customer-city", dest="customer_city", default="")
+    p.add_argument("--title", required=True, help="Leistungstitel")
+    p.add_argument("--description", default="")
+    p.add_argument("--amount", required=True, help="Rechnungsbetrag, z. B. 700,00")
+    p.add_argument("--reason", required=True, help="Warum die Rechnung importiert wird")
+    p.add_argument("--accept-warnings", dest="accept_warnings", action="store_true",
+                   help="Hinweise aus dem Abgleich mit dem PDF-Text bestätigen")
+    p.add_argument("--yes", action="store_true", help="Ohne Rückfrage importieren")
+    p.set_defaults(func=cmd_import_invoice)
+    p = sub.add_parser("restore-test", help="Backup testweise wiederherstellen, prüfen und protokollieren")
+    p.add_argument("file")
+    p.set_defaults(func=cmd_restore_test)
+    p = sub.add_parser("export", help="Datenexport für die Betriebsprüfung (GoBD, CSV + index.xml) erstellen")
+    p.add_argument("--year", metavar="JJJJ", help="Nur dieses Jahr exportieren (Standard: alles)")
+    p.set_defaults(func=cmd_export)
     p = sub.add_parser("restore", help="Backup in ein leeres Datenverzeichnis wiederherstellen")
     p.add_argument("file")
     p.add_argument("data_dir")

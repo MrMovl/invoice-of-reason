@@ -14,6 +14,16 @@ DEPLOY_HOST="${DEPLOY_HOST:-pi}"
 DEPLOY_PATH="${DEPLOY_PATH:-~/invoices}"
 APP_IMAGE="${APP_IMAGE:-invoice-of-reason:latest}"
 
+# GoBD Rz. 154 (Programmidentität): the running version must match a commit in git history.
+# The app records every version change in its database. Uncommitted changes would make the
+# deployed program unprovable, so they are refused unless explicitly allowed.
+if [ -n "$(git status --porcelain --untracked-files=no)" ] && [ "${ALLOW_DIRTY:-}" != "1" ]; then
+  echo "Uncommitted changes. Commit first (or ALLOW_DIRTY=1 for a marked -dirty build)." >&2
+  exit 1
+fi
+APP_VERSION="$(git describe --tags --always --dirty=-dirty) $(git log -1 --format=%cs)"
+echo ">> Version $APP_VERSION"
+
 map_arch() { sed 's/x86_64/amd64/;s/aarch64/arm64/;s/armv7l/arm\/v7/;s/armv6l/arm\/v6/'; }
 
 REMOTE_ARCH="$(ssh "$DEPLOY_HOST" 'uname -m')"
@@ -30,7 +40,7 @@ echo ">> Running tests inside a $PLATFORM image"
 docker build --platform "$PLATFORM" --target test -t "${APP_IMAGE%:*}:test" .
 
 echo ">> Building $APP_IMAGE for $PLATFORM"
-docker build --platform "$PLATFORM" --target runtime -t "$APP_IMAGE" .
+docker build --platform "$PLATFORM" --target runtime --build-arg APP_VERSION="$APP_VERSION" -t "$APP_IMAGE" .
 
 echo ">> Checking server prerequisites"
 ssh "$DEPLOY_HOST" "mkdir -p $DEPLOY_PATH/data $DEPLOY_PATH/backups $DEPLOY_PATH/config \

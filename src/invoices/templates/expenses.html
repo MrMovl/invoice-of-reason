@@ -25,18 +25,18 @@
 
 <form method="post" action="{{ url_for('web.expense_upload') }}" enctype="multipart/form-data" class="card upload">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <label>Belege hochladen <small>(PDF, JPEG oder PNG, mehrere möglich)</small>
-    <input name="files" type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" multiple required>
+  <label>Belege hochladen <small>(PDF, JPEG, PNG oder E-Rechnung als XML, mehrere möglich)</small>
+    <input name="files" type="file" accept="application/pdf,image/jpeg,image/png,application/xml,text/xml,.pdf,.jpg,.jpeg,.png,.xml" multiple required>
   </label>
   <button class="btn btn-primary" type="submit">Hochladen</button>
-  <p class="hint">Betrag, Datum, Rechnungsnummer und Lieferant werden aus PDFs mit Text automatisch gelesen. Fotos und Scans bitte von Hand ergänzen. Belege werden unveränderbar archiviert.</p>
+  <p class="hint">Betrag, Datum, Rechnungsnummer und Lieferant werden aus E-Rechnungen (XRechnung, ZUGFeRD/Factur-X) und PDFs mit Text automatisch gelesen. Fotos und Scans bitte von Hand ergänzen. Belege werden unveränderbar archiviert.</p>
 </form>
 
 <dl class="stats">
   <div><dt>Belege</dt><dd>{{ totals.count }}</dd></div>
   <div><dt>Bezahlt</dt><dd>{{ totals.paid|eur }}</dd></div>
   <div><dt>Offen</dt><dd>{{ totals.open|eur }}</dd></div>
-  <div><dt>Zu prüfen</dt><dd>{% if totals.to_review %}<a href="{{ url_for('web.expense_list', review=1) }}">{{ totals.to_review }}</a>{% else %}0{% endif %}</dd></div>
+  <div><dt>Zu prüfen</dt><dd>{% if totals.to_review %}<a href="{{ url_for('web.expense_list', review=1) }}">{{ totals.to_review }}</a>{% if late %} <span class="badge badge-late">{{ late|length }} über {{ review_days }} Tage</span>{% endif %}{% else %}0{% endif %}</dd></div>
 </dl>
 
 {% if review %}
@@ -61,7 +61,8 @@
       <td class="num">{{ r.amount_cents|eur if r.amount_cents else '–' }}</td>
       <td>
         <span class="badge badge-{{ r.status }}">{{ expense_status_labels[r.status] }}</span>
-        {% if not r.reviewed and r.status != 'void' %}<span class="badge badge-overdue">Zu prüfen</span>{% endif %}
+        {% if r.id in late %}<span class="badge badge-late">über {{ review_days }} Tage ungeprüft</span>
+        {% elif not r.reviewed and r.status != 'void' %}<span class="badge badge-overdue">Zu prüfen</span>{% endif %}
       </td>
       <td><a href="{{ url_for('web.expense_file', expense_id=r.id, inline=1) }}" target="_blank" rel="noopener">{{ r.doc_type|upper }}</a></td>
     </tr>

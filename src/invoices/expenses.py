@@ -1,8 +1,9 @@
-"""Expenses: received invoices and receipts, uploaded as PDF or image.
+"""Expenses: received invoices and receipts, uploaded as PDF, image or e-invoice XML.
 
 The uploaded document is archived like an issued invoice: exclusive create, read-only,
 SHA-256 recorded, never deleted. Its booking data (vendor, date, amount, ...) starts as a
-suggestion read from the PDF text layer and stays correctable; every change is logged.
+suggestion read from the e-invoice XML (plain or embedded in a ZUGFeRD PDF) or else from the PDF
+text layer, and stays correctable; every change is logged.
 """
 
 from __future__ import annotations
@@ -10,13 +11,16 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from . import db, extract
+from . import db, einvoice, extract
 from .archive import (
+    PAYMENT_METHODS,
     ArchiveError,
+    payment_label,
+    quote,
     _clean,
     _write_once,
     parse_amount,
@@ -33,8 +37,11 @@ DOC_TYPES = {
     "pdf": (b"%PDF-", "application/pdf"),
     "jpg": (b"\xff\xd8\xff", "image/jpeg"),
     "png": (b"\x89PNG\r\n\x1a\n", "image/png"),
+    "xml": (None, "application/xml"),  # detected by parsing, see detect_type
 }
 STATUSES = ("paid", "open", "void")
+STATUS_NAMES = {"paid": "Bezahlt", "open": "Offen", "void": "Verworfen"}
+REVIEW_DAYS = 10  # GoBD Rz. 47: unbare Geschäftsvorfälle within ten days
 FIELD_LABELS = {
     "vendor": "Lieferant",
     "invoice_number": "Rechnungsnummer",
@@ -43,6 +50,7 @@ FIELD_LABELS = {
     "category": "Kategorie",
     "status": "Status",
     "paid_date": "Bezahlt am",
+    "payment_method": "Zahlungsart",
     "notes": "Notiz",
 }
 
@@ -54,10 +62,14 @@ class DuplicateError(ArchiveError):
 
 
 def detect_type(data: bytes) -> str:
+    """By content, not by file name. XML counts only if it parses as an e-invoice."""
     for ext, (magic, _mime) in DOC_TYPES.items():
-        if data.startswith(magic):
+        if magic and data.startswith(magic):
             return ext
-    raise ArchiveError("Nur PDF, JPEG oder PNG werden unterstützt.")
+    if einvoice.looks_like_xml(data):
+        einvoice.parse(data)
+        return "xml"
+    raise ArchiveError("Nur PDF, JPEG, PNG oder E-Rechnungen (XRechnung-XML) werden unterstützt.")
 
 
 def mimetype(doc_type: str) -> str:
@@ -86,7 +98,21 @@ def store_upload(
 
     original_filename = original_filename.replace("\\", "/").rsplit("/", 1)[-1][:200]
     text = extract.pdf_text(data) if doc_type == "pdf" else ""
-    suggestion = extract.suggest(text)
+    text_layer = bool(text.strip())
+    # Structured e-invoice data beats text heuristics; a ZUGFeRD PDF stays the archived document.
+    invoice = einvoice.parse(data) if doc_type == "xml" else None
+    if doc_type == "pdf":
+        invoice = einvoice.from_pdf(data)
+    if invoice:
+        suggestion = invoice.suggestion()
+        source = "xml" if doc_type == "xml" else "zugferd"
+        text = text if text_layer else invoice.as_text()
+        extra = {"credit_note": invoice.credit_note, "currency": invoice.currency}
+    else:
+        suggestion = extract.suggest(text)
+        source = "text" if text_layer else "none"
+        extra = {}
+    in_euro = extra.get("currency") in (None, "", "EUR")  # other currencies are not prefilled
     stem = slugify(original_filename.rsplit(".", 1)[0], fallback="Beleg")
     rel_path = f"{today.year}/{today:%Y%m%d}_{stem}_{sha[:8]}.{doc_type}"
     now = db.now_iso()
@@ -94,14 +120,16 @@ def store_upload(
         "vendor": suggestion.vendor[:120],
         "invoice_number": suggestion.invoice_number[:60],
         "expense_date": suggestion.expense_date.isoformat() if suggestion.expense_date else None,
-        "amount_cents": int(suggestion.amount * 100) if suggestion.amount and suggestion.amount < 10_000_000 else None,
+        "amount_cents": int(suggestion.amount * 100)
+        if in_euro and suggestion.amount and suggestion.amount < 10_000_000 else None,
         "doc_path": rel_path,
         "doc_sha256": sha,
         "doc_size": len(data),
         "doc_type": doc_type,
         "original_filename": original_filename,
         "doc_text": text,
-        "suggestion_json": json.dumps({**suggestion.as_dict(), "text_layer": bool(text.strip())},
+        "suggestion_json": json.dumps({**suggestion.as_dict(), **extra, "source": source,
+                                       "text_layer": text_layer},
                                       ensure_ascii=False, sort_keys=True),
         # Counted from the upload, which is never earlier than the document date.
         "retain_until": retain_until(today, retention_years).isoformat(),
@@ -129,23 +157,52 @@ def store_upload(
 
 
 def parse_expense_form(form) -> dict:
-    """Validate the review form. A voided expense (wrong upload) needs no booking data."""
+    """Validate the review form. A voided expense (wrong upload) needs no booking data.
+    The category is the minimum business assignment (GoBD Rz. 50); a paid expense needs its
+    payment method (Rz. 79)."""
     status = form.get("status") or ""
     if status not in STATUSES:
         raise ArchiveError("Unbekannter Status.")
     required = status != "void"
     amount = (form.get("amount") or "").strip()
     paid_date = parse_date(form.get("paid_date"), "Zahlungsdatum", required=False)
+    payment_method = form.get("payment_method") or ""
+    if payment_method and payment_method not in PAYMENT_METHODS:
+        raise ArchiveError("Unbekannte Zahlungsart.")
     return {
         "vendor": _clean(form.get("vendor"), "Lieferant", 120, required=required),
         "invoice_number": _clean(form.get("invoice_number"), "Rechnungsnummer", 60, required=False),
         "expense_date": _iso(parse_date(form.get("expense_date"), "Rechnungsdatum", required=required)),
         "amount_cents": int(parse_amount(amount) * 100) if amount or required else None,
-        "category": _clean(form.get("category"), "Kategorie", 60, required=False),
+        "category": _clean(form.get("category"), "Kategorie", 60, required=required),
         "status": status,
         "paid_date": _iso(paid_date) if status == "paid" else None,
-        "notes": (form.get("notes") or "").replace("\r\n", "\n").strip()[:2000],
+        "payment_method": _payment_method(status, payment_method),
+        "notes": _clean_notes(form.get("notes")),
     }
+
+
+def _payment_method(status: str, method: str) -> str:
+    if status != "paid":
+        return ""
+    if not method:
+        raise ArchiveError("Zahlungsart fehlt.")
+    return method
+
+
+def review_overdue(row, today: date | None = None) -> bool:
+    """True if an unreviewed expense was uploaded more than REVIEW_DAYS days ago (GoBD Rz. 47)."""
+    if row["reviewed"] or row["status"] == "void":
+        return False
+    today = today or date.today()
+    return date.fromisoformat(row["created_at"][:10]) < today - timedelta(days=REVIEW_DAYS)
+
+
+def _clean_notes(value: str | None) -> str:
+    notes = (value or "").replace("\r\n", "\n").strip()
+    if len(notes) > 2000:
+        raise ArchiveError("Notiz ist zu lang (max. 2000 Zeichen).")
+    return notes
 
 
 def _iso(d: date | None) -> str | None:
@@ -160,7 +217,11 @@ def _show(field: str, value) -> str:
     if field in ("expense_date", "paid_date"):
         return format_date(date.fromisoformat(value))
     if field == "notes":
-        return "…"
+        return quote(value)
+    if field == "payment_method":
+        return payment_label(value)
+    if field == "status":
+        return STATUS_NAMES.get(value, value)
     return str(value)
 
 
@@ -169,6 +230,8 @@ def update_expense(conn: sqlite3.Connection, expense_id: int, values: dict) -> N
     row = conn.execute("SELECT * FROM expenses WHERE id = ?", (expense_id,)).fetchone()
     if row is None:
         raise ArchiveError("Beleg nicht gefunden.")
+    if values["status"] == "void" and row["status"] != "void" and not values["notes"]:
+        raise ArchiveError("Grund für das Verwerfen fehlt (Notiz).")
     changes = [
         f"{FIELD_LABELS[k]}: {_show(k, row[k])} → {_show(k, v)}"
         for k, v in values.items() if row[k] != v
@@ -179,7 +242,7 @@ def update_expense(conn: sqlite3.Connection, expense_id: int, values: dict) -> N
                      (*values.values(), db.now_iso(), expense_id))
         if changes or not row["reviewed"]:
             db.add_expense_event(conn, expense_id, "reviewed" if not row["reviewed"] else "updated",
-                                 "; ".join(changes)[:1000])
+                                 "; ".join(changes))
 
 
 def booking_date_sql() -> str:

@@ -4,7 +4,7 @@
 <div class="page-head">
   <h1>{{ exp.vendor or 'Beleg ' ~ exp.id }}</h1>
   <div class="actions">
-    <a class="btn" href="{{ url_for('web.expense_file', expense_id=exp.id, inline=1) }}" target="_blank" rel="noopener">Ansehen</a>
+    <a class="btn" href="{{ url_for('web.expense_file', expense_id=exp.id, inline=1) }}" target="_blank" rel="noopener">{{ 'XML ansehen' if exp.doc_type == 'xml' else 'Ansehen' }}</a>
     <a class="btn" href="{{ url_for('web.expense_file', expense_id=exp.id) }}">Herunterladen</a>
     <a class="btn" href="{{ url_for('web.expense_list') }}">Alle Ausgaben</a>
   </div>
@@ -14,9 +14,14 @@
 <p class="flash flash-error" role="alert">Integritätsproblem: {{ problem }}. Aus Backup wiederherstellen.</p>
 {% endif %}
 
+{% if review_late %}
+<p class="flash flash-error" role="alert">Über {{ review_days }} Tage ungeprüft (hochgeladen am {{ exp.created_at[:10]|de_date }}). Belege zeitnah prüfen und erfassen (GoBD Rz. 47).</p>
+{% endif %}
+
 {% if not exp.reviewed and exp.status != 'void' %}
 <p class="flash flash-warn">
-  {% if suggestion.text_layer %}Werte wurden automatisch aus dem PDF gelesen{% if not exp.amount_cents %}, ein Betrag wurde nicht gefunden{% endif %}. Bitte prüfen und speichern.
+  {% if suggestion.source in ('xml', 'zugferd') %}Werte wurden aus der E-Rechnung gelesen{% if not exp.amount_cents %}, ein Betrag in Euro wurde nicht gefunden{% endif %}. Bitte prüfen und speichern.
+  {% elif suggestion.text_layer %}Werte wurden automatisch aus dem PDF gelesen{% if not exp.amount_cents %}, ein Betrag wurde nicht gefunden{% endif %}. Bitte prüfen und speichern.
   {% else %}Kein lesbarer Text im Beleg. Bitte Werte von Hand eintragen.{% endif %}
 </p>
 {% endif %}
@@ -38,7 +43,7 @@
       <label>Rechnungsnummer
         <input name="invoice_number" value="{{ form.invoice_number or '' }}" maxlength="60">
       </label>
-      <label>Kategorie
+      <label>Kategorie <small>(Pflicht, außer bei „Verworfen“)</small>
         <input name="category" value="{{ form.category or '' }}" maxlength="60" list="categories" placeholder="z. B. Hosting, Hardware, Büro">
         <datalist id="categories">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
       </label>
@@ -50,6 +55,12 @@
       <label>Bezahlt am <small>(leer = Rechnungsdatum)</small>
         <input name="paid_date" type="date" value="{{ form.paid_date or '' }}">
       </label>
+      <label>Zahlungsart <small>(Pflicht bei „Bezahlt“; bar am selben Tag erfassen, GoBD Rz. 48)</small>
+        <select name="payment_method">
+          <option value="">–</option>
+          {% for key, label in payment_labels.items() %}<option value="{{ key }}" {{ 'selected' if key == form.payment_method }}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
       <label>Notiz
         <textarea name="notes" rows="2" maxlength="2000">{{ form.notes or '' }}</textarea>
       </label>
@@ -57,7 +68,7 @@
         <button class="btn btn-primary" type="submit">{{ 'Speichern' if exp.reviewed else 'Geprüft, speichern' }}</button>
         {% if next_review %}<button class="btn" type="submit" name="next" value="review">Speichern und nächster</button>{% endif %}
       </div>
-      <p class="hint">„Verworfen“ für Fehl-Uploads: der Beleg bleibt archiviert, zählt aber nicht mit.</p>
+      <p class="hint">„Verworfen“ für Fehl-Uploads, mit Grund in der Notiz: der Beleg bleibt archiviert, zählt aber nicht mit.</p>
     </form>
   </section>
 
@@ -67,15 +78,60 @@
     <a href="{{ url_for('web.expense_file', expense_id=exp.id, inline=1) }}" target="_blank" rel="noopener">
       <img class="doc-preview" src="{{ url_for('web.expense_file', expense_id=exp.id, inline=1) }}" alt="Beleg {{ exp.id }}">
     </a>
+    {% elif exp.doc_type == 'xml' %}
+    {% if invoice %}
+    <div class="einvoice">
+      <p class="einvoice-head">
+        <strong>{{ 'Gutschrift' if invoice.credit_note else 'Rechnung' }}</strong>
+        <span class="badge badge-open">E-Rechnung {{ invoice.syntax }}</span>
+        {% if invoice.credit_note %}<span class="badge badge-overdue">Gutschrift</span>{% endif %}
+      </p>
+      <dl class="kv">
+        <dt>Rechnungssteller</dt><dd>{{ invoice.seller or '–' }}</dd>
+        <dt>Empfänger</dt><dd>{{ invoice.buyer or '–' }}</dd>
+        <dt>Nummer</dt><dd>{{ invoice.number or '–' }}</dd>
+        <dt>Datum</dt><dd>{{ invoice.issue_date.isoformat()|de_date if invoice.issue_date else '–' }}</dd>
+        <dt>Fällig am</dt><dd>{{ invoice.due_date.isoformat()|de_date if invoice.due_date else '–' }}</dd>
+        <dt>Währung</dt><dd>{{ invoice.currency or '–' }}</dd>
+      </dl>
+      {% if invoice.lines %}
+      <div class="table-wrap">
+      <table class="einvoice-lines">
+        <thead><tr><th>Position</th><th class="num">Menge</th><th class="num">Netto</th></tr></thead>
+        <tbody>
+        {% for line in invoice.lines %}
+          <tr><td>{{ line.name or '–' }}</td><td class="num">{{ line.quantity|de_num }} {{ line.unit_label }}</td><td class="num">{{ line.net|money(invoice.currency) }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% endif %}
+      <dl class="kv einvoice-totals">
+        <dt>Summe netto</dt><dd>{{ invoice.net_total|money(invoice.currency) }}</dd>
+        <dt>Umsatzsteuer</dt><dd>{{ invoice.tax_total|money(invoice.currency) }}</dd>
+        <dt>Gesamtbetrag</dt><dd>{{ invoice.gross_total|money(invoice.currency) }}</dd>
+        <dt>Zahlbetrag</dt><dd><strong>{{ invoice.payable|money(invoice.currency) }}</strong></dd>
+      </dl>
+    </div>
+    {% else %}
+    <p class="flash flash-error">E-Rechnung kann nicht angezeigt werden: {{ invoice_error }}</p>
+    {% endif %}
     {% endif %}
     <h2>Automatisch erkannt</h2>
     <dl class="kv">
+      <dt>Quelle</dt><dd>{{ suggestion_sources.get(suggestion.source, suggestion.source) }}</dd>
       <dt>Lieferant</dt><dd>{{ suggestion.vendor or '–' }}</dd>
-      <dt>Betrag</dt><dd>{{ suggestion.amount_cents|eur if suggestion.amount_cents else '–' }}</dd>
+      <dt>Betrag</dt><dd>{% if not suggestion.amount_cents %}–{% elif suggestion.currency and suggestion.currency != 'EUR' %}{{ (suggestion.amount_cents|eur)[:-2] }} {{ suggestion.currency }}{% else %}{{ suggestion.amount_cents|eur }}{% endif %}</dd>
       <dt>Datum</dt><dd>{{ suggestion.expense_date|de_date or '–' }}</dd>
       <dt>Nummer</dt><dd>{{ suggestion.invoice_number or '–' }}</dd>
     </dl>
-    {% if exp.doc_text %}
+    {% if suggestion.credit_note %}
+    <p class="flash flash-warn">Gutschrift: Der Betrag ist als positiver Wert vorgeschlagen. Bitte prüfen, wie die Gutschrift gebucht wird.</p>
+    {% endif %}
+    {% if suggestion.currency and suggestion.currency != 'EUR' %}
+    <p class="flash flash-warn">Rechnung in {{ suggestion.currency }}: Betrag bitte in Euro eintragen, wie bezahlt.</p>
+    {% endif %}
+    {% if exp.doc_text and exp.doc_type != 'xml' %}
     <button class="btn" type="button" data-dialog-open="doc-text-dialog" aria-haspopup="dialog">Gelesenen Text anzeigen</button>
     <dialog id="doc-text-dialog" class="text-dialog" aria-labelledby="doc-text-title">
       <div class="dialog-head">

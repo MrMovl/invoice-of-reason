@@ -23,6 +23,9 @@ ENV PYTHONPATH=/app/src \
     INVOICES_DATA_DIR=/data \
     INVOICES_BACKUP_DIR=/backups \
     INVOICES_SENDER_FILE=/config/sender.toml
+# Set by deploy.sh to the git commit. Recorded in the database on every change (GoBD Rz. 154).
+ARG APP_VERSION=dev
+ENV INVOICES_VERSION=$APP_VERSION
 
 USER app
 EXPOSE 8000
@@ -36,7 +39,7 @@ CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "4", "
 # Test stage: `docker build --target test .` runs the suite against the Debian packages.
 FROM runtime AS test
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends python3-pytest && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends python3-pytest libxml2-utils && rm -rf /var/lib/apt/lists/*
 COPY tests ./tests
 COPY pyproject.toml ./
 USER app

@@ -17,6 +17,13 @@
   </form>
 </div>
 
+{% if number_findings %}
+<div class="flash flash-warn" role="status">
+  <p>Nummernkreis prüfen: Rechnungsnummern sollen lückenlos fortlaufend sein (GoBD Rz. 50).</p>
+  <ul>{% for message in number_findings %}<li>{{ message }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
 <dl class="stats">
   <div><dt>Rechnungen</dt><dd>{{ totals.count }}</dd></div>
   <div><dt>Umsatz</dt><dd>{{ totals.billed|eur }}</dd></div>
