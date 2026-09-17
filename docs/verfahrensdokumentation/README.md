@@ -34,7 +34,10 @@ nennt die Punkte, die dort beantwortet werden müssen.
 - Welche Programmversion (git-Commit) wann in Betrieb war, protokolliert das Programm selbst
   (Tabelle `system_events`, Eintrag `version`, siehe Teil 3 und 4). Zu jeder dort genannten Version
   gehört der Stand dieser Dokumentation im selben Commit.
-- Teil 6 wird ebenfalls versioniert (git oder datierte, nicht überschriebene Fassungen).
+- Teil 6 wird ebenfalls versioniert: entweder in einem privaten Repository oder als datierte,
+  nicht überschriebene Dateien in `data/dokumentation/` auf dem Server. Dieser Ordner ist Teil
+  jeder Datensicherung (mit Prüfsumme im Manifest); die monatlich dauerhaft aufbewahrten
+  Sicherungen sind die zweite Aufzeichnung dieser Änderungshistorie.
 - Beide Teile werden aufbewahrt, solange Unterlagen aufbewahrt werden, zu deren Verständnis sie
   nötig sind.
 

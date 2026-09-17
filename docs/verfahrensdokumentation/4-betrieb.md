@@ -6,7 +6,8 @@ Technische Details zu Befehlen: `README.md`, `docs/BACKUP.md`, `docs/EXPORT.md` 
 
 - Betrieb als Docker-Stack auf einem eigenen Server (Dienste `app` und `backup`), erreichbar nur
   über einen Cloudflare-Tunnel. Der Port ist nur lokal gebunden; es gibt keine offenen Ports.
-- Persistente Daten im Installationsverzeichnis: `data/` (Datenbank, Archiv), `backups/`
+- Persistente Daten im Installationsverzeichnis: `data/` (Datenbank, Archiv, `dokumentation/` mit
+  Teil 6 und weiteren Unterlagen), `backups/`
   (Sicherungen, Exporte), `config/sender.toml` (Absenderdaten, nur lesend eingebunden), `.env`
   (Anmeldedaten als scrypt-Hash, Sitzungsschlüssel, Aufbewahrungsjahre, Gründungsjahr
   `INVOICES_FOUNDING_YEAR` für die Umsatzgrenzen nach § 19 UStG).
@@ -45,8 +46,9 @@ Technische Details zu Befehlen: `README.md`, `docs/BACKUP.md`, `docs/EXPORT.md` 
   manuell über die Backups-Seite.
 - Vor jeder Sicherung: Prüfung aller Dateien gegen ihre Prüfsummen, der Hash-Ketten und der
   Trigger. Bei einem Fehler wird keine Sicherung erstellt und der Fehler protokolliert.
-- Inhalt: konsistente Kopie der Datenbank, alle Rechnungs-PDFs, alle Belegdateien, Manifest mit
-  SHA-256 jeder Datei und den Kettenenden (Teil 3.4).
+- Inhalt: konsistente Kopie der Datenbank, alle Rechnungs-PDFs, alle Belegdateien, der Ordner
+  `dokumentation/` (Teil 6 und weitere Unterlagen) sowie ein Manifest mit SHA-256 jeder Datei und
+  den Kettenenden (Teil 3.4).
 - Aufbewahrung: die letzten 30 Sicherungen und dauerhaft die jeweils letzte Sicherung jedes Monats.
 - Kopie außerhalb des Servers: Ziel, Häufigkeit, Verschlüsselung und Schlüsselaufbewahrung in
   Teil 6.

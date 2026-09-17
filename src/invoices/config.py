@@ -35,6 +35,13 @@ class Settings:
     def expenses_dir(self) -> Path:
         return self.data_dir / "expenses"
 
+    @property
+    def docs_dir(self) -> Path:
+        """Documents kept next to the data, above all the business-specific part 6 of the
+        Verfahrensdokumentation. In the data directory so every backup carries it (GoBD Rz. 154:
+        kept as long as the records it explains)."""
+        return self.data_dir / "dokumentation"
+
 
 def load_settings() -> Settings:
     data_dir = Path(os.environ.get("INVOICES_DATA_DIR", "data")).resolve()

@@ -215,3 +215,36 @@ def test_backups_page_shows_control_log(logged_in, csrf):
     logged_in.post("/backups", data={"csrf_token": csrf})
     html = logged_in.get("/backups").get_data(as_text=True)
     assert "Kontrollprotokoll" in html and "Backup" in html and "OK" in html
+
+
+def test_documentation_folder_is_backed_up_and_restored(store, tmp_path):
+    """Part 6 of the Verfahrensdokumentation lives next to the data, so every backup carries it."""
+    import tarfile
+
+    s, conn = store
+    s.docs_dir.mkdir(parents=True, exist_ok=True)
+    (s.docs_dir / "teil6-2026-09-17.md").write_text("# Teil 6\nBank: Beispielbank\n")
+    (s.docs_dir / "alt" ).mkdir()
+    (s.docs_dir / "alt" / "teil6-2026-01-02.md").write_text("alt\n")
+    path = backup.create_backup(s)
+
+    manifest = backup.verify_backup(path)
+    assert "dokumentation/teil6-2026-09-17.md" in manifest["files"]
+    assert "dokumentation/alt/teil6-2026-01-02.md" in manifest["files"]
+    with tarfile.open(path, "r:gz") as tar:
+        assert tar.extractfile("dokumentation/teil6-2026-09-17.md").read().decode().startswith("# Teil 6")
+
+    target = tmp_path / "restored"
+    backup.restore_backup(path, target)
+    restored = target / "dokumentation" / "teil6-2026-09-17.md"
+    assert restored.read_text().startswith("# Teil 6")
+    assert restored.stat().st_mode & 0o200, "documents stay editable after a restore"
+
+
+def test_backup_works_without_a_documentation_folder(store):
+    s, conn = store
+    import shutil as _shutil
+
+    if s.docs_dir.exists():
+        _shutil.rmtree(s.docs_dir)
+    assert backup.create_backup(s).is_file()

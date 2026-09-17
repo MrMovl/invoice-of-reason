@@ -84,6 +84,7 @@ def _create_backup(settings: Settings) -> Path:
         files = {"invoices.sqlite3": snapshot}
         files.update(_tree("archive", settings.archive_dir, "*.pdf"))
         files.update(_tree("expenses", settings.expenses_dir, "*"))
+        files.update(_tree("dokumentation", settings.docs_dir, "*"))
         manifest = {
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "files": {name: _sha256(p) for name, p in files.items()},
@@ -167,6 +168,8 @@ def restore_backup(path: Path, data_dir: Path) -> dict:
     for p in (*(data_dir / "archive").rglob("*.pdf"), *(data_dir / "expenses").rglob("*")):
         if p.is_file():
             p.chmod(0o444)
+    # Documents in dokumentation/ stay writable: they are edited by hand, and their history comes
+    # from dated file names plus the monthly backups.
     return manifest
 
 

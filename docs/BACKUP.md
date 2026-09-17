@@ -9,8 +9,8 @@ The `backup` service in `docker-compose.yml` runs `invoices backup` once at star
    loudly instead of copying a damaged archive.
 2. Takes a consistent SQLite snapshot with the online backup API (safe while the app runs).
 3. Writes `backups/invoices-backup-YYYYMMDD-HHMMSS.tar.gz` containing `invoices.sqlite3`,
-   `archive/**.pdf`, `expenses/**` (uploaded expense documents) and `manifest.json` (SHA-256 of
-   every file and the heads of the log hash chains). `restore-test` checks that the live database
+   `archive/**.pdf`, `expenses/**` (uploaded expense documents), `dokumentation/**` (see below) and
+   `manifest.json` (SHA-256 of every file and the heads of the log hash chains). `restore-test` checks that the live database
    still contains those heads, which reveals removed recent log entries. Off-site copies of the
    manifests are what makes this an external anchor.
 4. Rotates: keeps the newest `INVOICES_BACKUP_KEEP` (default 30) plus the newest backup of every
@@ -52,6 +52,17 @@ can be added later without touching the app:
 Whichever is chosen: keep at least one copy outside the house, and test a restore once a year
 with `invoices restore-test <file>` on the off-site copy. It restores into a temporary directory,
 verifies every document against the restored database and records the result in the control log.
+
+## Documents in the backup
+
+`data/dokumentation/` is meant for documents that belong to the records but are not created by the
+program, above all the business-specific part 6 of the Verfahrensdokumentation (the parts 1–5 are
+in this repository). Everything in it is copied into every backup with its checksum and restored as
+a writable file.
+
+It needs no repository, but changes must stay traceable (GoBD Rz. 154): write a new dated file per
+version (`teil6-2026-09-17.md`), never edit an old one, and keep the change table in the document.
+The 30 daily backups plus one per month, kept forever, are the second record of that history.
 
 ## Control log
 
