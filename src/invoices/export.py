@@ -63,7 +63,7 @@ DESCRIPTIONS = {
     "pdf_sha256": "SHA-256-Prüfsumme der archivierten PDF",
     "pdf_size": "Dateigröße der PDF in Bytes",
     "payload_json": "Vollständige Eingabedaten inkl. Absenderdaten zum Erstellungszeitpunkt (JSON)",
-    "retain_until": "Aufbewahrungspflicht endet am",
+    "retain_until": "Frühestes Ende der Aufbewahrung (Mindestfrist, läuft nicht ab, solange die Festsetzungsfrist offen ist, § 147 Abs. 3 AO)",
     "created_at": "Erfasst am (UTC)",
     "updated_at": "Zuletzt geändert am (UTC)",
     "invoice_id": "Verweis auf invoices.id",

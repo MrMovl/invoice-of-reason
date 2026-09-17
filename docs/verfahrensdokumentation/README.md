@@ -1,6 +1,7 @@
 # Verfahrensdokumentation
 
-Verfahrensdokumentation nach GoBD Rz. 151–155 für das Programm **invoice-of-reason**, mit dem
+Verfahrensdokumentation nach GoBD Rz. 151–155 (GoBD in der Fassung des BMF-Schreibens vom
+14.07.2025, BStBl 2025 I S. 1502) für das Programm **invoice-of-reason**, mit dem
 Ausgangsrechnungen erstellt und archiviert sowie Eingangsbelege erfasst, geprüft und archiviert
 werden. Sie richtet sich an einen sachverständigen Dritten (Rz. 148) und beschreibt, wie die
 Ordnungsvorschriften der §§ 145–147 AO im Verfahren umgesetzt sind.

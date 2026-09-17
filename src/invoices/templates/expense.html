@@ -150,7 +150,7 @@
       <dt>Original</dt><dd>{{ exp.original_filename or '–' }}</dd>
       <dt>SHA-256</dt><dd><code class="hash">{{ exp.doc_sha256 }}</code>{% if not problem %} <span class="badge badge-paid">geprüft</span>{% endif %}</dd>
       <dt>Hochgeladen</dt><dd>{{ exp.created_at[:10]|de_date }}</dd>
-      <dt>Aufbewahren bis</dt><dd>{{ exp.retain_until|de_date }}</dd>
+      <dt>Aufbewahren mindestens bis</dt><dd>{{ exp.retain_until|de_date }}</dd>
     </dl>
     <h2>Verlauf</h2>
     <ul class="events">

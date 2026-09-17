@@ -85,7 +85,7 @@
       <dt>Datei</dt><dd><code>{{ inv.pdf_path }}</code></dd>
       <dt>SHA-256</dt><dd><code class="hash">{{ inv.pdf_sha256 }}</code>{% if not problem %} <span class="badge badge-paid">geprüft</span>{% endif %}</dd>
       <dt>Herkunft</dt><dd>{{ 'Importiert' if inv.source == 'imported' else 'Erstellt' }} am {{ inv.created_at[:10]|de_date }}</dd>
-      <dt>Aufbewahren bis</dt><dd>{{ inv.retain_until|de_date }}</dd>
+      <dt>Aufbewahren mindestens bis</dt><dd>{{ inv.retain_until|de_date }}</dd>
     </dl>
     <h2>Verlauf</h2>
     <ul class="events">
