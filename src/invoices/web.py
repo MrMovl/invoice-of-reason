@@ -26,7 +26,7 @@ from flask import (
     url_for,
 )
 
-from . import archive, auth, backup, chain, db, einvoice, expenses, export, system
+from . import archive, auth, backup, chain, db, einvoice, expenses, export, system, turnover
 from .config import ConfigError, load_sender
 from .pdf import LayoutOverflowError, format_amount, format_date
 
@@ -238,10 +238,14 @@ def invoice_list():
         "open": sum(r["amount_cents"] for r in rows if r["status"] == "open"),
         "overdue": sum(1 for r in rows if r["status"] == "open" and r["due_date"] and r["due_date"] < today),
     }
-    return render_template("list.html", rows=rows, years=years, year=year, status=status,
+    return render_template("list.html", turnover=_turnover(conn), rows=rows, years=years, year=year, status=status,
                            q=q, totals=totals, today=today,
                            cash=expenses.cash_summary(conn, year),
                            number_findings=archive.number_findings(conn))
+
+
+def _turnover(conn) -> turnover.Status:
+    return turnover.status(conn, settings().founding_year)
 
 
 def _customers(conn):
@@ -283,7 +287,7 @@ def _load_sender():
 def invoice_new():
     conn = get_db()
     _load_sender()  # fail early if the sender config is missing
-    return render_template("new.html", form=_new_form_defaults(conn), customers=_customers(conn))
+    return render_template("new.html", turnover=_turnover(conn), form=_new_form_defaults(conn), customers=_customers(conn))
 
 
 @bp.post("/invoices/preview")
@@ -309,10 +313,11 @@ def invoice_create():
         inp = archive.parse_invoice_form(request.form)
         # sender.toml can change without a restart: log it before it shapes a new invoice.
         system.record_config(conn, s)
-        invoice_id = archive.issue_invoice(conn, s.archive_dir, inp, _load_sender(), s.retention_years)
+        invoice_id = archive.issue_invoice(conn, s.archive_dir, inp, _load_sender(), s.retention_years,
+                                           founding_year=s.founding_year)
     except (archive.ArchiveError, LayoutOverflowError) as e:
         flash(str(e), "error")
-        return render_template("new.html", form=request.form, customers=_customers(conn)), 400
+        return render_template("new.html", turnover=_turnover(conn), form=request.form, customers=_customers(conn)), 400
     flash("Rechnung erstellt und archiviert.", "ok")
     return redirect(url_for("web.invoice_detail", invoice_id=invoice_id))
 

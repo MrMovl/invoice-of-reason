@@ -8,7 +8,8 @@ Technische Details zu Befehlen: `README.md`, `docs/BACKUP.md`, `docs/EXPORT.md` 
   über einen Cloudflare-Tunnel. Der Port ist nur lokal gebunden; es gibt keine offenen Ports.
 - Persistente Daten im Installationsverzeichnis: `data/` (Datenbank, Archiv), `backups/`
   (Sicherungen, Exporte), `config/sender.toml` (Absenderdaten, nur lesend eingebunden), `.env`
-  (Anmeldedaten als scrypt-Hash, Sitzungsschlüssel).
+  (Anmeldedaten als scrypt-Hash, Sitzungsschlüssel, Aufbewahrungsjahre, Gründungsjahr
+  `INVOICES_FOUNDING_YEAR` für die Umsatzgrenzen nach § 19 UStG).
 - Konkreter Server, Standort und Zugänge: Teil 6.
 
 ## 4.2 Zugriffsschutz (Rz. 103)

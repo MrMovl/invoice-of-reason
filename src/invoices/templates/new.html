@@ -2,6 +2,7 @@
 {% block title %}Neue Rechnung{% endblock %}
 {% block content %}
 <h1>Neue Rechnung</h1>
+{% include "_turnover.html" %}
 <form method="post" action="{{ url_for('web.invoice_create') }}" class="card form-grid">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <fieldset>
@@ -45,6 +46,14 @@
       <input name="amount" value="{{ form.amount or '' }}" inputmode="decimal" placeholder="700,00" required>
     </label>
     <p class="hint">Kleinunternehmer nach § 19 UStG, keine Umsatzsteuer.</p>
+    <details class="span-2 number-override" {{ 'open' if form.limit_override }}>
+      <summary>Trotz Umsatzgrenze erstellen</summary>
+      <label class="check"><input type="checkbox" name="limit_override" value="1" {{ 'checked' if form.limit_override }}> Trotz Umsatzgrenze als Rechnung nach § 19 UStG erstellen</label>
+      <label>Grund <small>(wird im Verlauf protokolliert)</small>
+        <input name="limit_reason" value="{{ form.limit_reason or '' }}" maxlength="300">
+      </label>
+      <p class="hint">Nur nach Prüfung, z. B. wenn die Zahlungseingänge außerhalb des Programms anders aussehen. Eine § 19-Rechnung für eine steuerpflichtige Leistung ist falsch.</p>
+    </details>
   </fieldset>
 
   <div class="actions">

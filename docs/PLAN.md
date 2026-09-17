@@ -46,6 +46,17 @@ Reachable at `invoices.example.com` behind a login.
   that all protective triggers exist, so dropping a trigger and editing the file is detected.
   New columns must default to NULL or '' (omitted from hashes) or come with a re-seal migration.
 
+## Turnover limit monitor (§ 19 UStG)
+
+`turnover.py` counts paid invoices by `paid_date` year (receipts), projects open invoices, and
+applies the limits since 2025: previous year above 25,000 € ends the status for the whole year;
+the current year limit is 100,000 €, or 25,000 € in the founding year (`INVOICES_FOUNDING_YEAR`),
+with immediate effect from the crossing receipt. The invoice list and the new-invoice form show
+received, open, limit and headroom, warn at 80 % and when the current year passes 25,000 €.
+Issuing is refused when received + open + the new invoice exceed the limit, or the previous year
+exceeded 25,000 €, unless overridden with a reason that is logged in the `created` event. Imports
+are not checked. Only receipts recorded in the tool count.
+
 ## Expenses
 
 - Upload one or many PDF/JPEG/PNG files or XML e-invoices (max. 20 MB each). Identical files are

@@ -145,7 +145,7 @@ Programmidentität. Rules that follow:
 | 17 | Docs: GoBD second amendment (BMF 14.07.2025), retention since BEG IV | done (`gobd/legal-state-2025`); no code change needed |
 | 18 | Reverse charge flag on expenses (§ 13b UStG) | done (`gobd/reverse-charge`) |
 | 19 | Capital assets excluded from the expense total | done (`gobd/capital-assets`); register and AfA stay outside |
-| 20 | Turnover limit monitor (§ 19 UStG since 2025) | open |
+| 20 | Turnover limit monitor (§ 19 UStG since 2025) | done (`gobd/turnover-limit`) |
 | 9 | Cancellation document | design proposal pending |
 
 ## Questions for the Steuerberater
@@ -165,6 +165,12 @@ kept privately outside this repository.
 4. **Asset hint on gross amounts.** The hint compares the gross amount with the 800 € net limit, so
    it also appears for net prices between about 673 € and 800 € (at 19 % VAT). Is a net amount field
    worth adding? (#19)
+5. **Income outside the tool.** Does income that is not invoiced through this tool count toward the
+   Gesamtumsatz for the § 19 limits (e.g. other activities of the same Unternehmer)? If so, the
+   monitor needs a manual offset; today it only counts receipts recorded here. (#20)
+6. **Receipts vs. open invoices in the projection.** The monitor projects all open invoices into
+   the current year and blocks when the projection exceeds the limit. Is blocking on projected
+   (not yet received) amounts the right safety margin, or should only receipts block? (#20)
 
 ## Order
 

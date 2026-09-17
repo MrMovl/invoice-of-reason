@@ -17,6 +17,7 @@ nummerierte Migrationen `MIGRATIONS`).
 | `system.py` | Programmversion, Konfigurationshistorie, Kontrollprotokoll |
 | `backup.py` | Datensicherung, Prüfung, Wiederherstellung, Wiederherstellungstest |
 | `export.py` | Datenexport (Z3) |
+| `turnover.py` | Überwachung der Umsatzgrenzen der Kleinunternehmerregelung (§ 19 UStG) |
 | `invoice_import.py` | Import vor dem Programm erstellter Rechnungen (nur Kommandozeile) |
 | `cli.py` | Kommandozeile: `verify`, `backup`, `verify-backup`, `restore-test`, `restore`, `export`, `import-invoice` |
 
@@ -101,7 +102,7 @@ gespeichert, `updated` später geändert, `sealed` wie oben.
 |---|---|
 | `version` | Programmversion bei Inbetriebnahme: git-Commit und Commit-Datum, `-dirty` bei nicht eingechecktem Stand, `dev` bei Entwicklung |
 | `schema_migration` | `<Nummer>: <Beschreibung>` der ausgeführten Schemaänderung |
-| `config_changed` | vollständige neue Konfiguration als JSON: Aufbewahrungsjahre, Anzahl Sicherungen, Absenderdaten |
+| `config_changed` | vollständige neue Konfiguration als JSON: Aufbewahrungsjahre, Anzahl Sicherungen, Gründungsjahr (`founding_year`), Absenderdaten |
 | `trigger_missing` | beim Start fehlende Schutz-Trigger (werden wiederhergestellt; der Eintrag bleibt als Hinweis auf einen Eingriff) |
 
 ### control_runs – Kontrollprotokoll

@@ -29,6 +29,27 @@ Rechnungsliste zeigt Lücken und Abweichungen im Nummernkreis als Warnung an.
 **Fehlerhafte Rechnung:** Eine erstellte Rechnung wird nie geändert oder gelöscht. Sie wird
 storniert (2.3) und eine neue, korrekte Rechnung erstellt.
 
+**Umsatzgrenzen der Kleinunternehmerregelung (§ 19 UStG, Regeln seit 2025):** Das Formular und die
+Rechnungsliste zeigen für das laufende Jahr die Zahlungseingänge (bezahlte Rechnungen nach
+Zahlungsdatum), die offenen Rechnungen, die maßgebliche Grenze und den verbleibenden Spielraum
+einschließlich offener Rechnungen, außerhalb des Gründungsjahrs auch den Vorjahresumsatz.
+
+- Maßgebliche Grenze: im Gründungsjahr (Einstellung `INVOICES_FOUNDING_YEAR`) 25.000 € für das
+  Gründungsjahr selbst, sonst 100.000 € für das laufende Jahr. Wird sie überschritten, endet die
+  Kleinunternehmerregelung sofort; der Zahlungseingang, mit dem die Grenze überschritten wird, und
+  alle späteren sind steuerpflichtig. Das Programm nennt diese Rechnung.
+- Lag der Vorjahresumsatz über 25.000 €, gilt die Regelung im laufenden Jahr nicht.
+- Warnungen: ab 80 % der maßgeblichen Grenze (offene Rechnungen eingerechnet), sobald das laufende
+  Jahr 25.000 € übersteigt (dann gilt die Regelung im Folgejahr nicht), und wenn das Gründungsjahr
+  nicht eingestellt ist.
+- Sperre: Würden Eingänge, offene Rechnungen und die neue Rechnung zusammen die maßgebliche Grenze
+  übersteigen, oder lag das Vorjahr über 25.000 €, wird die Rechnung abgelehnt. Eine Rechnung mit
+  Hinweis auf § 19 UStG wäre für eine steuerpflichtige Leistung falsch, und das Programm kann noch
+  keine Rechnungen mit Umsatzsteuer erstellen. Nur mit „Trotz Umsatzgrenze erstellen“ und einem Grund
+  wird sie erstellt; Prüfergebnis und Grund stehen im Verlauf der Rechnung.
+- Es zählen nur die im Programm erfassten Zahlungseingänge. Importierte Rechnungen (2.9) werden nicht
+  gesperrt, zählen aber mit, sobald sie als bezahlt erfasst sind.
+
 ## 2.2 Zahlungseingang erfassen
 
 Auf der Detailseite der Rechnung „Als bezahlt markieren“ mit Zahlungsdatum und Zahlungsart

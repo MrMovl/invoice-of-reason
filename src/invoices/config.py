@@ -21,6 +21,7 @@ class Settings:
     sender_file: Path
     retention_years: int
     backup_keep: int
+    founding_year: int | None = None  # year the business started; § 19 UStG limits differ then
 
     @property
     def db_path(self) -> Path:
@@ -47,7 +48,17 @@ def load_settings() -> Settings:
         ).resolve(),
         retention_years=int(os.environ.get("INVOICES_RETENTION_YEARS", "10")),
         backup_keep=int(os.environ.get("INVOICES_BACKUP_KEEP", "30")),
+        founding_year=_founding_year(os.environ.get("INVOICES_FOUNDING_YEAR", "")),
     )
+
+
+def _founding_year(raw: str) -> int | None:
+    raw = raw.strip()
+    if not raw:
+        return None
+    if not raw.isdigit() or not 1900 <= int(raw) <= 2100:
+        raise ConfigError(f"INVOICES_FOUNDING_YEAR muss eine Jahreszahl sein, nicht {raw!r}.")
+    return int(raw)
 
 
 def load_sender(path: Path) -> Sender:

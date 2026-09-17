@@ -203,6 +203,7 @@ class InvoiceInput:
     description: str
     amount: Decimal
     number_reason: str = ""  # why a number outside the running sequence is used on purpose
+    limit_reason: str = ""  # why a § 19 invoice is issued although the turnover limit check objects
 
     def to_invoice_data(self) -> InvoiceData:
         service = format_date(self.service_from)
@@ -271,7 +272,14 @@ def parse_invoice_form(form) -> InvoiceInput:
         description=_clean(form.get("description"), "Beschreibung", 1000, required=False),
         amount=parse_amount(form.get("amount") or ""),
         number_reason=_number_reason(form),
+        limit_reason=_limit_reason(form),
     )
+
+
+def _limit_reason(form) -> str:
+    if not form.get("limit_override"):
+        return ""
+    return _clean(form.get("limit_reason"), "Grund für die Rechnung trotz Umsatzgrenze", 300)
 
 
 def _number_reason(form) -> str:
@@ -286,16 +294,26 @@ def issue_invoice(
     inp: InvoiceInput,
     sender: Sender,
     retention_years: int,
+    founding_year: int | None = None,
 ) -> int:
     """Render, archive and record a new invoice. Returns the invoice id."""
+    from . import turnover
+
     number = validate_number(conn, inp.number)
-    detail = ""
+    details = []
     problem = number_problem(conn, number, inp.issue_date)
     if problem:
         if not inp.number_reason:
             raise ArchiveError(f"{problem} Um sie trotzdem zu verwenden, „Abweichende Nummer bewusst "
                                "verwenden“ ankreuzen und einen Grund angeben.")
-        detail = f"Abweichende Nummer: {problem} Grund: {quote(inp.number_reason)}"
+        details.append(f"Abweichende Nummer: {problem} Grund: {quote(inp.number_reason)}")
+    limit = turnover.issue_problem(conn, founding_year, inp.issue_date, int(inp.amount * 100))
+    if limit:
+        if not inp.limit_reason:
+            raise ArchiveError(f"{limit} Um die Rechnung trotzdem zu erstellen, „Trotz Umsatzgrenze erstellen“ "
+                               "ankreuzen und einen Grund angeben.")
+        details.append(f"Umsatzgrenze § 19 UStG: {limit} Grund: {quote(inp.limit_reason)}")
+    detail = "; ".join(details)
     data = inp.to_invoice_data()
     pdf = render_invoice(data, sender)
     rel_path = f"{data.issue_date.year}/{pdf_filename(number, data.customer_name)}"

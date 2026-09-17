@@ -33,6 +33,9 @@ aufnehmen). Jede Fassung mit Datum versehen; alte Fassungen nicht überschreiben
 - Bargeschäfte: kommen sie vor, wie werden sie erfasst
 - Erstellung der EÜR und Steuererklärungen (Programm, Steuerberater), wie die Summen aus diesem
   Programm übernommen werden, Zuordnung der Kategorien zu Zeilen der Anlage EÜR (Rz. 97)
+- Gründungsjahr des Unternehmens (Einstellung `INVOICES_FOUNDING_YEAR`) und ob es Umsätze außerhalb
+  dieses Programms gibt, die für die Kleinunternehmergrenzen (§ 19 UStG) zählen könnten, und wie
+  sie überwacht werden
 - Anlagenverzeichnis (§ 4 Abs. 3 Satz 5 EStG): wo und wie es geführt wird, wer die AfA berechnet,
   wie es mit den als „Anlagegut“ markierten Belegen abgeglichen wird
 - Umsatzsteuer nach § 13b UStG auf Eingangsleistungen: in welchen Zeiträumen gemeldet wird
