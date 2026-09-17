@@ -1,13 +1,12 @@
 <section class="cash turnover" aria-labelledby="turnover-head">
   <h2 id="turnover-head">Kleinunternehmergrenze {{ turnover.year }} <small>§ 19 UStG, nach Zahlungseingang{% if turnover.is_founding_year %}, Gründungsjahr{% endif %}</small></h2>
   <dl class="stats">
-    <div><dt>Eingenommen {{ turnover.year }}</dt><dd>{{ turnover.received|eur }}</dd></div>
-    <div><dt>davon in diesem Programm</dt><dd>{{ turnover.received_internal|eur }}</dd></div>
-    <div><dt>davon außerhalb erfasst</dt><dd><a href="{{ url_for('web.external_receipts') }}">{{ turnover.received_external|eur }}</a></dd></div>
-    <div><dt>Offene Rechnungen</dt><dd>{{ turnover.open|eur }}</dd></div>
-    <div><dt>Maßgebliche Grenze</dt><dd>{{ turnover.limit|eur }}</dd></div>
-    <div><dt>Spielraum <small>(inkl. offener)</small></dt><dd class="{{ 'negative' if turnover.headroom < 0 }}">{{ turnover.headroom|eur }}</dd></div>
-    {% if not turnover.is_founding_year %}<div><dt>Vorjahr <small>(Grenze 25.000,00 €)</small></dt><dd class="{{ 'negative' if turnover.lost_by_previous_year }}">{{ turnover.previous_year|eur }}</dd></div>{% endif %}
+    <div><dt>Eingenommen {{ turnover.year }}</dt><dd>{{ turnover.received|eur }}
+      <small>in diesem Programm {{ turnover.received_internal|eur }} · <a href="{{ url_for('web.external_receipts') }}">außerhalb {{ turnover.received_external|eur }}</a></small></dd></div>
+    <div><dt>Offene Rechnungen</dt><dd>{{ turnover.open|eur }}<small>als Vorausschau eingerechnet</small></dd></div>
+    <div><dt>Maßgebliche Grenze</dt><dd>{{ turnover.limit|eur }}<small>{{ 'Gründungsjahr' if turnover.is_founding_year else 'laufendes Jahr' }}</small></dd></div>
+    <div><dt>Spielraum</dt><dd class="{{ 'negative' if turnover.headroom < 0 }}">{{ turnover.headroom|eur }}<small>inkl. offener Rechnungen</small></dd></div>
+    {% if not turnover.is_founding_year %}<div><dt>Vorjahr {{ turnover.year - 1 }}</dt><dd class="{{ 'negative' if turnover.lost_by_previous_year }}">{{ turnover.previous_year|eur }}<small>Grenze 25.000,00 €</small></dd></div>{% endif %}
   </dl>
   {% if turnover.warnings %}
   <div class="flash {{ 'flash-error' if turnover.lost or turnover.headroom < 0 else 'flash-warn' }}" role="status">
