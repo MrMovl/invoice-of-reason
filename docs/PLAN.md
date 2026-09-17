@@ -63,6 +63,10 @@ Reachable at `invoices.example.com` behind a login.
   (BEG IV); 10 years is the safer default you asked for. Nothing is deleted automatically.
 - Cancelled invoices stay in the archive with status "Storniert" and a reason.
 
+## GoBD
+
+See [GOBD.md](GOBD.md) for the gap analysis against the GoBD and the resulting work plan.
+
 ## Backups
 
 See [BACKUP.md](BACKUP.md). Daily tar.gz with SQLite snapshot, all PDFs, and a checksum manifest.
