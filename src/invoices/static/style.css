@@ -141,8 +141,15 @@ summary:hover { color: var(--deep); }
 .stats dd a:hover { color: var(--sand-deep); }
 .stats dd.negative { color: var(--err); }
 .stats .badge { vertical-align: middle; }
-.cash { margin-top: -0.5rem; }
-.cash h2 { margin-bottom: .9rem; }
+/* Sections that follow a block of stats: keep their own spacing, never overlap the text above. */
+.cash { margin: 1.75rem 0 2rem; }
+.stats + .cash { margin-top: 0; }   /* stats already bring their own bottom margin */
+.cash h2 { margin: 0 0 .9rem; }
+.cash .stats { margin-bottom: 0; }
+.cash .stats + .hint, .cash .flash + .hint { margin-top: 1rem; }
+.cash > .hint:last-child { margin-bottom: 0; }
+.stats dd small { display: block; margin-top: 6px; font: 400 11px/1.5 var(--mono); letter-spacing: .04em;
+  color: var(--soft); text-transform: none; }
 
 /* Tables: no heavy header, hairlines like the service rows */
 .table-wrap { padding: 0; overflow-x: auto; }
