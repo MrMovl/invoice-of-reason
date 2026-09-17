@@ -23,8 +23,12 @@ Technische Details zu Befehlen: `README.md`, `docs/BACKUP.md`, `docs/EXPORT.md` 
 ## 4.3 Programmänderungen und Programmidentität (Rz. 80, 153–154)
 
 1. Änderungen am Programm werden im git-Repository vorgenommen und eingecheckt; Tests laufen
-   automatisch.
-2. `deploy.sh` verweigert die Auslieferung nicht eingecheckter Änderungen. Das Image wird gebaut,
+   automatisch. Änderungen gelangen über Pull Requests mit Merge-Commits in den Hauptzweig `main`;
+   Squash- und Rebase-Merges sind im Repository abgeschaltet, `main` ist gegen Force-Push und
+   Löschen geschützt. Damit bleibt jeder einmal auf `main` gelangte Commit in der Historie.
+2. `deploy.sh` (über `scripts/deploy-check.sh`) verweigert die Auslieferung nicht eingecheckter
+   Änderungen und jedes Commits, der nicht auf `main` liegt. Notfall-Auslieferungen sind nur
+   ausdrücklich möglich und in der Version als `-dirty` bzw. `-unmerged` gekennzeichnet. Das Image wird gebaut,
    die Testsuite läuft im Zielformat, die Version (git-Commit und Datum) wird in das Image
    geschrieben.
 3. Beim Start trägt das Programm jede neue Version in `system_events` (`version`) ein, führt
