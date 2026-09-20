@@ -37,21 +37,92 @@ docker compose exec app invoices verify
 
 Without Docker, a backup is a plain tar.gz: `tar xzf file.tar.gz` gives you the database and PDFs.
 
-## Off-site: not decided yet
+## Off-site copy: Hetzner Storage Box
 
-Everything a copy needs is in `~/invoices/backups/` on the Pi (owned by uid 1000). Any of these
-can be added later without touching the app:
+Chosen target: a **Hetzner Storage Box BX11** (1 TB, data centre in Germany, SSH/SFTP/rsync,
+Borg and restic, server-side snapshots, sub-accounts). Ten years of backups stay well under a
+gigabyte, so the smallest box is far more than enough; it was picked for the location, the
+snapshots and the price, not the space.
 
-| Option | Effort | Notes |
-|--------|--------|-------|
-| **restic** to Hetzner Storage Box / Backblaze B2 / S3 | cron + one config | Encrypted, deduplicated, versioned. Best fit for 10-year retention. Back up `~/invoices/data` directly or the tarballs. |
-| **rclone** sync to a cloud drive (Proton Drive, pCloud, ...) | cron | Use `rclone copy` (not `sync`) so deletions never propagate. Encrypt with an rclone `crypt` remote. |
-| Pull from the dev machine | cron/systemd timer on laptop | `rsync -a pi:invoices/backups/ ~/invoice-backups/`. Only works while the laptop is on. |
-| USB disk on the Pi | cron | Protects against SD card death, not against theft/fire. |
+`scripts/offsite-backup.sh` runs on the Pi and pushes `~/invoices/backups` there with restic:
+encrypted and deduplicated client-side, so Hetzner never sees the invoices. It copies the
+finished tarballs, not the live data directory – each tarball was written only after every
+checksum and hash chain verified, and each one is readable without this program.
 
-Whichever is chosen: keep at least one copy outside the house, and test a restore once a year
-with `invoices restore-test <file>` on the off-site copy. It restores into a temporary directory,
-verifies every document against the restored database and records the result in the control log.
+### Setup
+
+1. Order the box, create a **sub-account** for the Pi with its own directory, and enable SSH
+   plus an automatic snapshot plan (daily, keep 7). The snapshots are the protection that
+   restic cannot give: they survive a compromised Pi deleting or rewriting the remote data.
+2. On the Pi, give the box an SSH alias, because restic's sftp URL has no place for port 23:
+
+   ```sh
+   # ~/.ssh/config
+   Host storagebox
+       HostName uXXXXXX.your-storagebox.de
+       User uXXXXXX-sub1
+       Port 23
+       IdentityFile ~/.ssh/id_ed25519
+   ```
+
+   ```sh
+   ssh-copy-id -s -p 23 uXXXXXX-sub1@uXXXXXX.your-storagebox.de   # -s: restricted shell
+   ssh storagebox ls                                              # must work without a password
+   ```
+3. Write the configuration and the repository passphrase:
+
+   ```sh
+   install -m 600 /dev/null ~/.config/invoices-restic.pass
+   openssl rand -base64 32 > ~/.config/invoices-restic.pass
+   install -m 600 /dev/null ~/.config/invoices-offsite.env
+   cat > ~/.config/invoices-offsite.env <<'EOF'
+   RESTIC_REPOSITORY=sftp:storagebox:invoices
+   RESTIC_PASSWORD_FILE=/home/USER/.config/invoices-restic.pass
+   EOF
+   ```
+
+   **The passphrase is part of the records.** Without it every off-site copy is unreadable for
+   the rest of the ten-year retention period. It goes on paper and into part 6 of the
+   Verfahrensdokumentation, not only onto the Pi, which is the machine the copy exists for.
+4. Copy the script to the Pi (`deploy.sh` ships only the image and the compose file, so the
+   repository is not on the server), initialise the repository and run it once:
+
+   ```sh
+   scp scripts/offsite-backup.sh pi:invoices/offsite-backup.sh    # from the dev machine
+   ssh pi 'sudo apt install -y restic && invoices/offsite-backup.sh init && invoices/offsite-backup.sh'
+   ```
+5. Run it daily, an hour after the backup service:
+
+   ```sh
+   crontab -e   # 40 3 * * * $HOME/invoices/offsite-backup.sh >> $HOME/invoices/offsite.log 2>&1
+   ```
+
+   Re-copy the script after changing it in the repository; it is the one file of this project
+   that lives on the Pi outside Docker.
+
+Retention off-site: 14 daily snapshots plus one per month for 120 months. Because restic
+deduplicates, keeping ten years of monthly snapshots costs almost nothing beyond the tarballs
+themselves. Every run also verifies the repository and reads back a thirtieth of the stored
+data, so all of it is re-read once a month.
+
+### Yearly control
+
+```sh
+scripts/offsite-backup.sh restore-test
+```
+
+It pulls the newest tarball from the Storage Box, restores it into a temporary directory and
+lets `invoices restore-test` verify every document against the restored database and compare the
+log hash chain heads with the live database. The result is written to the control log. Testing
+the off-site copy – not a local file – is the point: it proves the copy that would actually be
+used is intact.
+
+### Other targets
+
+The script is restic, so nothing is tied to Hetzner: any restic backend (Backblaze B2, S3, a
+second box) works by changing `RESTIC_REPOSITORY`. For a plain cloud drive instead, `rclone copy`
+(never `sync`, so deletions never propagate) through an rclone `crypt` remote does the same job.
+Whatever it is, keep at least one copy outside the house and test the restore once a year.
 
 ## Documents in the backup
 
