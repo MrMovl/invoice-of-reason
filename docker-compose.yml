@@ -2,6 +2,7 @@
 # the Pi does not build it. Everything persistent lives next to this file:
 #   ./data     SQLite database + archived PDFs (keep 10 years)
 #   ./backups  daily backup tarballs, the pickup point for off-site copies
+#   ./reports  report.json for the read-only SSH user (INVOICES_REPORT_DIR overrides it)
 #   ./config   sender.toml (IBAN, tax number), read-only
 #   .env       login + secret key
 services:
@@ -28,6 +29,27 @@ services:
       - ./data:/data
       - ./backups:/backups
       - ./config:/config:ro
+    healthcheck:
+      disable: true
+    mem_limit: 128m
+    depends_on:
+      - app
+
+  # Business figures as JSON for an unprivileged SSH user (README, "Read-only report"). No
+  # env_file: the container gets neither the login hash nor the secret key, and config/ (sender
+  # data) is not mounted at all. The database is opened with mode=ro; the data mount itself stays
+  # writable because SQLite needs the -shm file of a WAL database, which only exists while
+  # another connection is open.
+  report:
+    image: ${APP_IMAGE:-invoice-of-reason:latest}
+    restart: unless-stopped
+    command: ["invoices", "report", "--json", "--out", "/reports/report.json", "--every", "3600"]
+    network_mode: none
+    environment:
+      INVOICES_FOUNDING_YEAR: ${INVOICES_FOUNDING_YEAR:-}
+    volumes:
+      - ./data:/data
+      - ${INVOICES_REPORT_DIR:-./reports}:/reports
     healthcheck:
       disable: true
     mem_limit: 128m

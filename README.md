@@ -132,6 +132,55 @@ docker compose run --rm app invoices export --year 2025   # CSV + index.xml expo
 
 Tax audit data export (GoBD Z3): see [docs/EXPORT.md](docs/EXPORT.md).
 
+### Read-only report over SSH
+
+`invoices report --json [--year JJJJ]` prints the business figures of one year (default: the
+current one) as JSON: invoices and cancellation documents (number, date, customer, title, amount,
+status, payment date, cancellation link), income, refunds and expenses per month by payment date
+with the surplus before AfA, the § 19 UStG figures (received, open, recorded outside the tool,
+applicable limit, headroom) and the share of the largest customer. It opens the database with
+SQLite `mode=ro`: no writes, no migrations, no log entries. It never prints sender data, settings,
+paths, hosts or versions; any failure is one generic line on stderr and a non-zero exit code.
+
+The `report` service runs it every hour and writes `report.json` into the report directory,
+replacing the file only with a complete new report; `generated_at` in the file shows its age. It
+gets no login data, no sender data and no network. Another machine fetches the file over SSH as
+a separate system user that can read this one file and nothing else: no access to the stack, the
+data directory or Docker.
+
+One-time setup on the server (placeholders in capitals):
+
+```sh
+# report directory outside the home directory, writable by the container user (uid 1000)
+sudo install -d -o 1000 -g 1000 -m 755 /srv/invoices-report
+echo 'INVOICES_REPORT_DIR=/srv/invoices-report' >> ~/invoices/.env
+
+# system user without password; its authorized_keys belong to root, so the user cannot change them
+sudo useradd --system --create-home --home-dir /var/lib/invoices-report --shell /bin/sh invoices-report
+sudo install -d -o root -g root -m 755 /var/lib/invoices-report/.ssh
+sudo install -o root -g root -m 644 /dev/null /var/lib/invoices-report/.ssh/authorized_keys
+sudoedit /var/lib/invoices-report/.ssh/authorized_keys
+```
+
+The one line in that `authorized_keys` pins the key to reading the file:
+
+```
+command="cat /srv/invoices-report/report.json 2>/dev/null || { echo 'FEHLER: Bericht nicht verfügbar.' >&2; exit 1; }",restrict,from="203.0.113.10" ssh-ed25519 AAAA...PLACEHOLDER report-client
+```
+
+- `restrict` turns off forwarding, the PTY and `~/.ssh/rc`; the forced command ignores whatever
+  the client asks to run.
+- `from=` limits the key to the client's address; drop it if that address is not fixed.
+- If `sshd_config` has `AllowUsers` or `AllowGroups`, add the user there.
+- Then deploy (or `docker compose up -d`) and check that `/srv/invoices-report/report.json`
+  appears.
+
+From the client:
+
+```sh
+ssh -i ~/.ssh/report_key invoices-report@SERVER > report.json
+```
+
 ## License
 
 Code: MIT. Fonts in `src/invoices/fonts` (PDF) and `src/invoices/static/fonts` (web UI): SIL Open Font

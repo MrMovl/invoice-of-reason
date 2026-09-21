@@ -21,6 +21,10 @@ Technische Details zu Befehlen: `README.md`, `docs/BACKUP.md`, `docs/EXPORT.md` 
 - Empfohlen und in Teil 6 festzuhalten: vorgeschaltete Zugangskontrolle (Cloudflare Access) als
   zweiter Faktor.
 - Wer Zugriff auf den Server und seine Dateien hat und wie (z. B. SSH mit Schlüssel): Teil 6.
+- Optional nur lesender Zugriff auf Geschäftszahlen: Der Dienst `report` schreibt stündlich eine
+  Berichtsdatei (`invoices report --json`, Datenbank nur lesend geöffnet, keine Änderungen). Ein
+  eigener Systemnutzer ohne Zugriff auf Programm, Datenbank und Docker kann per SSH-Schlüssel nur
+  diese Datei lesen (Forced Command). Ob eingerichtet und wer den Schlüssel hat: Teil 6.
 
 ## 4.3 Programmänderungen und Programmidentität (Rz. 80, 153–154)
 
