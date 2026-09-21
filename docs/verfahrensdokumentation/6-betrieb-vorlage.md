@@ -25,6 +25,8 @@ nicht überschreiben und die Änderungshistorie (6.6) pflegen.
 
 - Installation dieses Programms: Server (Gerät, Standort), Zugang (Domain, Cloudflare Access ja/nein),
   Speicherort der Installation, wer Zugriff auf den Server und seine Dateien hat und wie
+- Lesender Zugriff auf die Berichtsdatei per SSH (Dienst `report`): ob eingerichtet, seit wann,
+  welcher Rechner bzw. wer den Schlüssel hat, wo er liegt
 - Geschäftskonto: Bank, Form der Kontoauszüge (PDF/CSV), wo und wie lange sie abgelegt werden
 - Geschäftliche E-Mails mit Beleg- oder Geschäftsbrieffunktion (Rz. 121): Postfach, Ablage,
   Aufbewahrung

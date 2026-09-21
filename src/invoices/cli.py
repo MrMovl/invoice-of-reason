@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import json
+import re
 import secrets
 import sys
 import time
@@ -148,6 +150,51 @@ def cmd_export(args) -> int:
     return 0
 
 
+def _report_json(year: str | None) -> str:
+    from . import report
+
+    s = load_settings()
+    conn = report.connect_readonly(s.db_path)
+    try:
+        data = report.build(conn, int(year) if year else None, s.founding_year)
+    finally:
+        conn.close()
+    return json.dumps(data, ensure_ascii=False, indent=2)
+
+
+def cmd_report(args) -> int:
+    """Read-only business report as JSON (README, "Read-only report"). Every failure ends in one
+    generic message: no path, setting, version or stack trace may reach whoever reads the output.
+    With --out the file is replaced only by a complete new report; a failed run leaves the last
+    one in place, and its generated_at shows how old it is."""
+    from . import report
+
+    if args.every and not args.out:
+        print("--every nur zusammen mit --out.", file=sys.stderr)
+        return 2
+    stamp = (lambda: f"{time.strftime('%F %T')} ") if args.every else (lambda: "")
+    while True:
+        try:
+            out = _report_json(args.year)
+            if args.out:
+                report.write_atomic(Path(args.out), out + "\n")
+            else:
+                print(out)
+            code = 0
+        except Exception:
+            print(f"{stamp()}FEHLER: Bericht nicht verfügbar.", file=sys.stderr, flush=True)
+            code = 1
+        if not args.every:
+            return code
+        time.sleep(args.every)
+
+
+def _year(value: str) -> str:
+    if not re.fullmatch(r"\d{4}", value):
+        raise argparse.ArgumentTypeError("Jahr als JJJJ angeben")
+    return value
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="invoices")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -183,6 +230,12 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("export", help="Datenexport für die Betriebsprüfung (GoBD, CSV + index.xml) erstellen")
     p.add_argument("--year", metavar="JJJJ", help="Nur dieses Jahr exportieren (Standard: alles)")
     p.set_defaults(func=cmd_export)
+    p = sub.add_parser("report", help="Geschäftszahlen nur lesend als JSON ausgeben (für SSH mit Forced Command)")
+    p.add_argument("--json", action="store_true", required=True, help="Ausgabe als JSON (einziges Format)")
+    p.add_argument("--year", type=_year, metavar="JJJJ", help="Jahr (Standard: laufendes Jahr)")
+    p.add_argument("--out", metavar="DATEI", help="In diese Datei schreiben statt auf die Standardausgabe")
+    p.add_argument("--every", type=int, metavar="SEKUNDEN", help="Endlos wiederholen in diesem Abstand (mit --out)")
+    p.set_defaults(func=cmd_report)
     p = sub.add_parser("restore", help="Backup in ein leeres Datenverzeichnis wiederherstellen")
     p.add_argument("file")
     p.add_argument("data_dir")

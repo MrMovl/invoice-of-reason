@@ -38,7 +38,7 @@ echo ">> Building $APP_IMAGE for $PLATFORM"
 docker build --platform "$PLATFORM" --target runtime --build-arg APP_VERSION="$APP_VERSION" -t "$APP_IMAGE" .
 
 echo ">> Checking server prerequisites"
-ssh "$DEPLOY_HOST" "mkdir -p $DEPLOY_PATH/data $DEPLOY_PATH/backups $DEPLOY_PATH/config \
+ssh "$DEPLOY_HOST" "mkdir -p $DEPLOY_PATH/data $DEPLOY_PATH/backups $DEPLOY_PATH/reports $DEPLOY_PATH/config \
   && test -f $DEPLOY_PATH/.env || { echo 'missing $DEPLOY_PATH/.env (see .env.example)'; exit 1; } \
   && test -f $DEPLOY_PATH/config/sender.toml || { echo 'missing $DEPLOY_PATH/config/sender.toml'; exit 1; }"
 
