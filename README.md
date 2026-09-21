@@ -115,6 +115,10 @@ docker compose run --rm app invoices backup     # extra backup now
 docker compose run --rm app invoices restore-test /backups/<file>   # restore into a temp dir, verify, log it
 ```
 
+The off-site copy runs outside Docker: `scripts/offsite-backup.sh` pushes the backup tarballs to a
+Hetzner Storage Box with restic, daily from cron, and `scripts/offsite-backup.sh restore-test`
+is the yearly control on that copy. Setup in [docs/BACKUP.md](docs/BACKUP.md).
+
 ### Importing an invoice issued before the program
 
 Only for invoices that were created and sent before this tool existed (e.g. 2026-001). The PDF is
