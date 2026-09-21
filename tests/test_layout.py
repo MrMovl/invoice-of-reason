@@ -21,3 +21,9 @@ def test_turnover_block_stays_compact(logged_in, csrf):
     assert block.count("<dt>") <= 5, "too many tiles: they wrap into a second row"
     assert block.rindex("hint") > block.rindex("</dl>"), "the hint belongs below the tiles"
     assert "in diesem Programm" in block and "außerhalb" in block
+
+
+def test_turnover_block_comes_after_the_cash_overview(logged_in, csrf):
+    logged_in.post("/invoices", data={**invoice_form(), "csrf_token": csrf})
+    html = logged_in.get("/invoices").get_data(as_text=True)
+    assert html.index('id="cash-head"') < html.index('id="turnover-head"')
