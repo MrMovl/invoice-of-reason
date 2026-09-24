@@ -62,6 +62,14 @@
           {% for key, label in payment_labels.items() %}<option value="{{ key }}" {{ 'selected' if key == (form.payment_method or ('bank' if form.status != 'void' else '')) }}>{{ label }}</option>{% endfor %}
         </select>
       </label>
+      <label>Betrieblicher Anteil <small>(Prozent; 100 = vollständig betrieblich)</small>
+        <input name="business_percent" type="number" min="0" max="100" step="1" inputmode="numeric"
+               value="{{ form.business_percent if form.business_percent is not none else 100 }}">
+      </label>
+      {% if exp.business_percent is not none and exp.amount_cents %}
+      <p class="hint">Gespeichert: {{ exp.business_percent }} % von {{ exp.amount_cents|eur }} = {{ deductible|eur }} als Betriebsausgabe, der Rest ist privat.</p>
+      {% endif %}
+      <p class="hint">Unter 100 % nur bei gemischt genutzten Leistungen (z. B. ein Abo, das auch privat genutzt wird). Wie der Anteil ermittelt wurde, gehört in die Notiz; abgezogen wird nur der betriebliche Teil (§ 4 Abs. 4 EStG). Die Umsatzsteuer nach § 13b UStG bleibt davon unberührt und wird vom vollen Betrag berechnet.</p>
       <label class="check"><input type="checkbox" name="treatment" value="asset" {{ 'checked' if form.treatment == 'asset' }}> Anlagegut, wird abgeschrieben (AfA)</label>
       {% if asset_hint %}
       <p class="flash flash-warn">Betrag über {{ gwg_limit|eur }}: Ist das ein abnutzbares Wirtschaftsgut mit einem Nettopreis über {{ gwg_limit|eur }} (GWG-Grenze, § 6 Abs. 2 EStG), wird es nicht sofort abgezogen, sondern abgeschrieben und ins Anlagenverzeichnis aufgenommen (§ 4 Abs. 3 Satz 5 EStG). Maßgeblich ist der Nettopreis, auch ohne Vorsteuerabzug. Nur ein Hinweis, Speichern ist trotzdem möglich.</p>

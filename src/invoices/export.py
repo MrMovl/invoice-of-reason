@@ -95,6 +95,7 @@ DESCRIPTIONS = {
     "payment_method": "Zahlungsart: bank = Überweisung/Karte, cash = bar, private = privat bezahlt (Einlage), leer = nicht erfasst",
     "reverse_charge": "Steuerschuldnerschaft des Leistungsempfängers: 13b = § 13b UStG, leer = nein bzw. nicht markiert",
     "treatment": "Behandlung der Ausgabe: asset = Anlagegut, wird abgeschrieben (nicht in der Ausgabensumme), leer = sofort abziehbare Ausgabe",
+    "business_percent": "Betrieblicher Anteil in Prozent (ganze Zahl 0-99); leer = vollständig betrieblich (100 %). Betriebsausgabe ist amount_cents * Anteil / 100, kaufmännisch auf ganze Cent gerundet",
     "hash": "SHA-256 der Hash-Kette: Hash des vorigen Eintrags + Inhalt dieses Eintrags (siehe README)",
     "state_hash": "SHA-256 des Datensatzes (Rechnung bzw. Beleg) nach dieser Änderung",
 }
@@ -393,6 +394,14 @@ expenses.treatment:
                   asset = Anlagegut über der GWG-Grenze, wird abgeschrieben (AfA); zählt nicht zu
                   den sofort abziehbaren Ausgaben. Anlagenverzeichnis und AfA werden außerhalb des
                   Programms geführt. leer = gewöhnliche Ausgabe.
+expenses.business_percent:
+                  Betrieblicher Anteil einer gemischt genutzten Leistung in ganzen Prozent (0-99).
+                  Leer = vollständig betrieblich (100 %); leer sind auch alle Belege, die vor
+                  Einführung des Feldes erfasst wurden. Als Betriebsausgabe zählt
+                  amount_cents * Anteil / 100, je Beleg kaufmännisch auf ganze Cent gerundet; der
+                  Rest ist privat. Der Aufteilungsmaßstab steht in notes bzw. im
+                  Änderungsprotokoll. Die Bemessungsgrundlage nach § 13b UStG bleibt der volle
+                  Betrag (amount_cents).
 
 Einträge in den Protokollen (action bzw. kind)
 ----------------------------------------------

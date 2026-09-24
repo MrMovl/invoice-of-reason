@@ -141,6 +141,19 @@ eintragen, dann „Geprüft, speichern“. „Speichern und nächster“ führt 
   trotzdem möglich. Anlagegüter zählen nicht zu den Ausgaben der Übersicht (2.8). Das
   Anlagenverzeichnis und die Abschreibung werden außerhalb des Programms geführt (§ 4 Abs. 3
   Satz 5 EStG, Teil 6). Änderungen werden protokolliert.
+- **Betrieblicher Anteil:** Prozentwert, voreingestellt 100. Unter 100 nur bei gemischt genutzten
+  Leistungen, die zugleich betrieblich und privat genutzt werden (z. B. ein Abo, ein Anschluss).
+  Abgezogen wird dann nur der betriebliche Teil (§ 4 Abs. 4 EStG), kaufmännisch auf ganze Cent
+  gerundet; der Rest erscheint in der Übersicht als „Privatanteil“ und mindert den Gewinn nicht.
+  Wie der Anteil ermittelt wurde (der Aufteilungsmaßstab), ist bei einem Wert unter 100 % Pflicht
+  und gehört in die Notiz; ohne sie speichert das Programm nicht. Der Anteil ist schätzbar, muss
+  aber nachvollziehbar und über die Jahre gleichbleibend begründet sein; wiederkehrende Fälle
+  gehören in Teil 6. 0 % ist zulässig für eine privat veranlasste Zahlung vom Geschäftskonto.
+  **Nicht jede gemischte Ausgabe darf aufgeteilt werden** (§ 12 Nr. 1 EStG); im Zweifel ist das
+  eine Frage an die Steuerberatung. Der Anteil gilt auch für Anlagegüter: als „Anlagegüter“ wird
+  dann nur der betriebliche Teil der Anschaffungskosten gezeigt. Für § 13b UStG bleibt der volle
+  Betrag die Bemessungsgrundlage, weil die Umsatzsteuer auf das Entgelt der bezogenen Leistung
+  entsteht und nicht von der privaten Mitbenutzung abhängt. Änderungen werden protokolliert.
 - **Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG):** ankreuzen, wenn der Leistende die
   Umsatzsteuer nicht selbst berechnet und sie deshalb der Unternehmer schuldet, typischerweise bei
   Leistungen von Unternehmen im Ausland (Cloud-Dienste, Software, APIs). Das gilt auch für
@@ -182,6 +195,10 @@ Beleg bleibt archiviert und zählt nicht zu den Ausgaben.
   Belege sind nicht in den Ausgaben enthalten, sondern werden getrennt als „Anlagegüter“ gezeigt;
   der Überschuss heißt deshalb „Überschuss vor AfA“.
 - Ausgabenliste: Filter „Nur Anlagegüter“; markierte Belege tragen das Kennzeichen „Anlagegut“.
+  Belege mit einem betrieblichen Anteil unter 100 % tragen das Kennzeichen „… % betrieblich“.
+- Einnahmen und Ausgaben: „Ausgaben“ und „Anlagegüter“ enthalten nur den betrieblichen Anteil der
+  bezahlten Belege. Die Differenz zum tatsächlich gezahlten Betrag steht als „Privatanteil“
+  darunter, sodass sich die Übersicht mit den Kontoauszügen abstimmen lässt.
 - § 13b UStG (Ausgabenseite): Für das gewählte Jahr (ohne Auswahl das laufende) je Quartal und für
   das Jahr die Summe der als § 13b markierten, nicht verworfenen Belege als Bemessungsgrundlage,
   zugeordnet nach Rechnungsdatum als Näherung für den Leistungszeitraum, dazu 19 % als

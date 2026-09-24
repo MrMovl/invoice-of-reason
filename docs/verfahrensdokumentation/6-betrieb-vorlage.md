@@ -42,6 +42,9 @@ nicht überschreiben und die Änderungshistorie (6.6) pflegen.
   Zahlungseingänge in die Erfassung „Umsätze außerhalb dieses Programms“ übernommen werden
 - Anlagenverzeichnis (§ 4 Abs. 3 Satz 5 EStG): wo und wie es geführt wird, wer die AfA berechnet,
   wie es mit den als „Anlagegut“ markierten Belegen abgeglichen wird
+- Gemischt genutzte Leistungen mit einem betrieblichen Anteil unter 100 %: welche wiederkehrend
+  vorkommen (z. B. Abonnements, Anschlüsse), nach welchem Maßstab der Anteil ermittelt wird, worauf
+  die Schätzung beruht, wann er überprüft wird, und ob die Steuerberatung dem Maßstab zugestimmt hat
 - Umsatzsteuer nach § 13b UStG auf Eingangsleistungen: in welchen Zeiträumen gemeldet wird
   (Voranmeldung oder nur Jahreserklärung), wer die Meldung erstellt, wie die Summen aus dem
   Programm übernommen werden

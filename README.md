@@ -4,7 +4,8 @@ Small self-hosted tool to create, track and archive invoices for a German Kleinu
 (§ 19 UStG). Fill in a form, get a branded PDF, keep it tamper-evident for 10 years, back it up.
 Upload received invoices and receipts as expenses, including e-invoices (XRechnung, ZUGFeRD);
 amounts are read from the document automatically. Cancel a sent invoice with a Stornorechnung,
-mark purchases under § 13b UStG and capital assets, and watch the § 19 turnover limits.
+mark purchases under § 13b UStG and capital assets, record only the business share of a mixed
+expense, and watch the § 19 turnover limits.
 
 - Flask + SQLite, PDFs rendered with reportlab, expense PDFs read with `pdftotext` (poppler)
 - Runs as a Docker stack on a Raspberry Pi behind Cloudflare Tunnel

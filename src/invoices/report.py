@@ -80,11 +80,13 @@ def _cash(conn: sqlite3.Connection, year: str) -> dict:
         "SELECT substr(paid_date, 6, 2), -SUM(amount_cents) FROM invoices WHERE kind = ? AND status = 'paid'"
         " AND paid_date IS NOT NULL AND substr(paid_date, 1, 4) = ? GROUP BY 1", (CANCELLATION, year))
     day = expenses.booking_date_sql()
+    # Only the business share of an expense is deductible; the rest is private and counts nowhere.
+    deductible = expenses.deductible_sql()
     spent = _by_month(conn,
-        f"SELECT substr({day}, 6, 2), SUM(amount_cents) FROM expenses WHERE status = 'paid' AND treatment = ''"
+        f"SELECT substr({day}, 6, 2), SUM({deductible}) FROM expenses WHERE status = 'paid' AND treatment = ''"
         f" AND substr({day}, 1, 4) = ? GROUP BY 1", (year,))
     assets = _by_month(conn,
-        f"SELECT substr({day}, 6, 2), SUM(amount_cents) FROM expenses WHERE status = 'paid' AND treatment = ?"
+        f"SELECT substr({day}, 6, 2), SUM({deductible}) FROM expenses WHERE status = 'paid' AND treatment = ?"
         f" AND substr({day}, 1, 4) = ? GROUP BY 1", (expenses.ASSET, year))
     months = []
     for m in range(1, 13):

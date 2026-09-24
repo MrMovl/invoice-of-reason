@@ -52,12 +52,13 @@ def issue(s, conn, number, customer, amount, issue_on, paid_on=None):
     return inv
 
 
-def expense(s, conn, marker, amount, paid_on, treatment=""):
+def expense(s, conn, marker, amount, paid_on, treatment="", business_percent="", notes=""):
     exp = expenses.store_upload(conn, s.expenses_dir, PNG + marker, "beleg.png", s.retention_years,
                                 today=date(2026, 9, 16))
     expenses.update_expense(conn, exp, expenses.parse_expense_form({
         "vendor": "Beispiel Bürobedarf", "expense_date": paid_on, "paid_date": paid_on, "category": "Büro",
-        "payment_method": "bank", "amount": amount, "status": "paid", "treatment": treatment}))
+        "payment_method": "bank", "amount": amount, "status": "paid", "treatment": treatment,
+        "business_percent": business_percent, "notes": notes}))
 
 
 @pytest.fixture
@@ -74,6 +75,7 @@ def book(store):
     db.add_external_receipt(conn, "2026-05-01", 20000, "Marktplatz")
     expense(s, conn, b"a", "120,00", "2026-02-03")
     expense(s, conn, b"b", "1.200,00", "2026-06-10", treatment="asset")
+    expense(s, conn, b"c", "40,00", "2026-02-20", business_percent="75", notes="Abo auch privat genutzt")
     return s, conn
 
 
@@ -102,13 +104,14 @@ def test_report_contents(book, capsys):
     months = {m["month"]: m for m in data["cash"]["months"]}
     assert len(months) == 12
     assert months["2026-01"]["income_cents"] == 50000
+    # 120,00 € fully business plus 75 % of 40,00 €: only the business share is deducted.
     assert months["2026-02"] == {"month": "2026-02", "income_cents": 300000, "refunds_cents": 0,
-                                  "expenses_cents": 12000, "assets_cents": 0,
-                                  "surplus_before_afa_cents": 288000}
+                                  "expenses_cents": 15000, "assets_cents": 0,
+                                  "surplus_before_afa_cents": 285000}
     assert months["2026-04"]["refunds_cents"] == 100000
     assert months["2026-06"]["assets_cents"] == 120000 and months["2026-06"]["surplus_before_afa_cents"] == 0
-    assert data["cash"]["totals"] == {"income_cents": 450000, "refunds_cents": 100000, "expenses_cents": 12000,
-                                      "assets_cents": 120000, "surplus_before_afa_cents": 338000}
+    assert data["cash"]["totals"] == {"income_cents": 450000, "refunds_cents": 100000, "expenses_cents": 15000,
+                                      "assets_cents": 120000, "surplus_before_afa_cents": 335000}
 
     assert data["small_business"] == {
         "received_cents": 450000, "open_cents": 25000, "received_outside_cents": 20000,

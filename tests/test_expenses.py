@@ -4,9 +4,9 @@ from datetime import date
 
 import pytest
 
-from invoices import archive, backup, db, expenses
+from invoices import archive, backup, chain, db, expenses
 from invoices.config import load_settings
-from tests.conftest import SAMPLE_EXPENSE, invoice_form, make_pdf
+from tests.conftest import SAMPLE_EXPENSE, csrf_from, invoice_form, make_pdf
 
 needs_pdftotext = pytest.mark.skipif(not shutil.which("pdftotext"), reason="pdftotext not installed")
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
@@ -97,7 +97,7 @@ def test_cash_summary_by_payment_date(store):
     summary = expenses.cash_summary(conn, "2026")
     summary.pop("reverse_charge")
     assert summary == {"year": "2026", "income": 0, "refunds": 0, "expenses": 10000, "assets": 0,
-                       "surplus_before_afa": -10000, "to_review": 0}
+                       "private": 0, "surplus_before_afa": -10000, "to_review": 0}
     assert expenses.cash_summary(conn, "2027")["surplus_before_afa"] == 70000 - 3000
     assert expenses.cash_summary(conn, "x' OR 1=1")["year"] == ""
 
@@ -122,3 +122,131 @@ def test_verify_and_backup_include_expenses(store, tmp_path):
     assert expenses.verify_all(conn, s.expenses_dir) == [(f"Beleg {exp_id}", "Prüfsumme stimmt nicht")]
     with pytest.raises(backup.BackupError, match="inkonsistent"):
         backup.create_backup(s)
+
+
+# ── Betrieblicher Anteil (§ 4 Abs. 4 EStG) ────────────────────────────────
+
+SHARED = {"vendor": "V", "expense_date": "2026-03-01", "paid_date": "2026-03-01", "category": "Software",
+          "payment_method": "bank", "status": "paid"}
+
+
+def test_an_expense_is_fully_business_unless_something_says_otherwise(store):
+    """100 % is stored as an empty column: it is the normal case, and an empty new column keeps the
+    record hashes of entries made before the field existed valid (db.canonical)."""
+    s, conn = store
+    for i, form in enumerate(({}, {"business_percent": ""}, {"business_percent": "100"})):
+        exp_id = upload(s, conn, PNG + bytes([i]))
+        expenses.update_expense(conn, exp_id, expenses.parse_expense_form({**SHARED, "amount": "20", **form}))
+        assert conn.execute("SELECT business_percent FROM expenses WHERE id = ?", (exp_id,)).fetchone()[0] is None
+    assert expenses.cash_summary(conn, "2026")["expenses"] == 6000
+
+
+def test_migration_keeps_existing_database_verifiable(env, monkeypatch):
+    s = load_settings()
+    conn = db.connect(s.db_path)
+    number = next(i for i, (desc, _) in enumerate(db.MIGRATIONS, start=1) if desc == "business share on expenses")
+    with monkeypatch.context() as m:
+        m.setattr(db, "MIGRATIONS", db.MIGRATIONS[:number - 1])
+        db.init_db(conn)
+        exp_id = upload(s, conn, PNG)
+        columns = {r[1] for r in conn.execute("PRAGMA table_info(expenses)")}
+        expenses.update_expense(conn, exp_id, {k: v for k, v in expenses.parse_expense_form(
+            {**SHARED, "amount": "20"}).items() if k in columns})
+    db.init_db(conn)
+    assert conn.execute("SELECT business_percent FROM expenses").fetchone()[0] is None
+    assert chain.verify_chains(conn) == []
+    assert expenses.cash_summary(conn, "2026")["expenses"] == 2000
+    conn.close()
+
+
+def test_only_the_business_share_is_deducted(store):
+    s, conn = store
+    exp_id = upload(s, conn, PNG)
+    expenses.update_expense(conn, exp_id, expenses.parse_expense_form(
+        {**SHARED, "amount": "20", "business_percent": "70", "notes": "Geschätzt nach Nutzung"}))
+    summary = expenses.cash_summary(conn, "2026")
+    assert summary["expenses"] == 1400
+    assert summary["private"] == 600
+    assert summary["surplus_before_afa"] == -1400
+
+
+def test_the_share_of_an_asset_counts_as_an_asset_not_as_an_expense(store):
+    s, conn = store
+    exp_id = upload(s, conn, PNG)
+    expenses.update_expense(conn, exp_id, expenses.parse_expense_form(
+        {**SHARED, "amount": "1000", "treatment": "asset", "business_percent": "60", "notes": "60 % betrieblich"}))
+    summary = expenses.cash_summary(conn, "2026")
+    assert (summary["expenses"], summary["assets"], summary["private"]) == (0, 60000, 40000)
+
+
+def test_the_share_is_rounded_per_document_and_the_sql_matches_python(store):
+    s, conn = store
+    for i, amount in enumerate(("10,01", "0,01", "33,33")):
+        exp_id = upload(s, conn, PNG + bytes([i]))
+        expenses.update_expense(conn, exp_id, expenses.parse_expense_form(
+            {**SHARED, "amount": amount, "business_percent": "50", "notes": "hälftig"}))
+    # 1001 -> 501 (half up), 1 -> 1 (0.5 rounds up), 3333 -> 1667 (half up)
+    assert expenses.cash_summary(conn, "2026")["expenses"] == 501 + 1 + 1667
+    rows = conn.execute("SELECT amount_cents, business_percent FROM expenses").fetchall()
+    assert [expenses.deductible_cents(r[0], r[1]) for r in rows] == [501, 1, 1667]
+
+
+def test_a_share_below_100_percent_needs_a_reason(store):
+    with pytest.raises(archive.ArchiveError, match="Aufteilungsmaßstab"):
+        expenses.parse_expense_form({**SHARED, "amount": "20", "business_percent": "70"})
+
+
+def test_a_share_outside_0_to_100_is_refused(store):
+    for bad in ("101", "-1", "abc", "70,5"):
+        with pytest.raises(archive.ArchiveError, match="Betrieblicher Anteil"):
+            expenses.parse_expense_form({**SHARED, "amount": "20", "business_percent": bad, "notes": "x"})
+
+
+def test_zero_percent_is_paid_but_deducts_nothing(store):
+    s, conn = store
+    exp_id = upload(s, conn, PNG)
+    expenses.update_expense(conn, exp_id, expenses.parse_expense_form(
+        {**SHARED, "amount": "20", "business_percent": "0", "notes": "Privat vom Geschäftskonto bezahlt"}))
+    summary = expenses.cash_summary(conn, "2026")
+    assert (summary["expenses"], summary["private"]) == (0, 2000)
+
+
+def test_the_full_amount_stays_the_tax_base_of_a_13b_purchase(store):
+    s, conn = store
+    exp_id = upload(s, conn, PNG)
+    expenses.update_expense(conn, exp_id, expenses.parse_expense_form(
+        {**SHARED, "amount": "100", "business_percent": "50", "reverse_charge": "13b", "notes": "hälftig"}))
+    assert expenses.reverse_charge_summary(conn, 2026)["base"] == 10000
+
+
+def test_changing_the_share_is_logged(store):
+    s, conn = store
+    exp_id = upload(s, conn, PNG)
+    expenses.update_expense(conn, exp_id, expenses.parse_expense_form({**SHARED, "amount": "20"}))
+    expenses.update_expense(conn, exp_id, expenses.parse_expense_form(
+        {**SHARED, "amount": "20", "business_percent": "70", "notes": "Nutzung geschätzt"}))
+    detail = conn.execute(
+        "SELECT detail FROM expense_events WHERE expense_id = ? ORDER BY id DESC LIMIT 1", (exp_id,)).fetchone()[0]
+    assert "Betrieblicher Anteil: 100 % → 70 %" in detail
+
+
+def test_the_share_can_be_set_in_the_review_form(logged_in, app):
+    s = app.config["SETTINGS"]
+    conn = db.connect(s.db_path)
+    exp_id = upload(s, conn, PNG)
+    conn.close()
+    page = logged_in.get(f"/expenses/{exp_id}").get_data(as_text=True)
+    form = {"csrf_token": csrf_from(page), "vendor": "Anthropic", "amount": "20,00",
+            "expense_date": "2026-03-01", "paid_date": "2026-03-01", "status": "paid",
+            "category": "Software", "payment_method": "bank"}
+
+    resp = logged_in.post(f"/expenses/{exp_id}", data={**form, "business_percent": "70"})
+    assert "Aufteilungsmaßstab" in resp.get_data(as_text=True)
+
+    resp = logged_in.post(f"/expenses/{exp_id}",
+                          data={**form, "business_percent": "70", "notes": "Abo auch privat genutzt"})
+    assert resp.status_code == 302
+    page = logged_in.get(f"/expenses/{exp_id}").get_data(as_text=True)
+    assert "70 % von 20,00 € = 14,00 € als Betriebsausgabe" in page
+    assert "70 % betrieblich" in logged_in.get("/expenses").get_data(as_text=True)
+    assert "Privatanteil" in logged_in.get("/invoices?year=2026").get_data(as_text=True)
