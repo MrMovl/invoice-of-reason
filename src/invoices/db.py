@@ -324,6 +324,17 @@ MIGRATIONS: list[tuple[str, str | Callable[[sqlite3.Connection], None]]] = [
         BEGIN SELECT RAISE(ABORT, 'external receipts are append-only'); END;
         """,
     ),
+    (
+        "business share on expenses",
+        # § 4 Abs. 4 EStG: only the business share of a mixed expense is deductible. NULL means
+        # fully business, which is the case for every row recorded before this migration and the
+        # normal case afterwards; a NULL default also keeps existing record hashes valid (see the
+        # canonical form above). Booking data, so it stays changeable and every change is logged.
+        """
+        ALTER TABLE expenses ADD COLUMN business_percent INTEGER
+            CHECK (business_percent IS NULL OR business_percent BETWEEN 0 AND 99);
+        """,
+    ),
 ]
 
 

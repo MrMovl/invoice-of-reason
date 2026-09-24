@@ -53,6 +53,7 @@ FIELD_LABELS = {
     "payment_method": "Zahlungsart",
     "reverse_charge": "Steuerschuldnerschaft § 13b UStG",
     "treatment": "Anlagegut (AfA)",
+    "business_percent": "Betrieblicher Anteil",
     "notes": "Notiz",
 }
 ASSET = "asset"
@@ -62,6 +63,7 @@ ASSET = "asset"
 # the net price even without input VAT deduction, but the tool only knows gross amounts: the review
 # hint uses the gross amount, which is never below the net price, so no case is missed.
 GWG_LIMIT_NET_CENTS = 80_000
+FULL_BUSINESS_PERCENT = 100
 REVERSE_CHARGE = "13b"
 # § 13b Abs. 5 UStG: a Kleinunternehmer owes the VAT on these purchases (typically services from
 # suppliers abroad, § 13b Abs. 1 UStG) and has to declare it. Standard rate § 12 Abs. 1 UStG;
@@ -242,7 +244,7 @@ def parse_expense_form(form) -> dict:
     payment_method = form.get("payment_method") or ""
     if payment_method and payment_method not in PAYMENT_METHODS:
         raise ArchiveError("Unbekannte Zahlungsart.")
-    return {
+    values = {
         "vendor": _clean(form.get("vendor"), "Lieferant", 120, required=required),
         "invoice_number": _clean(form.get("invoice_number"), "Rechnungsnummer", 60, required=False),
         "expense_date": _iso(parse_date(form.get("expense_date"), "Rechnungsdatum", required=required)),
@@ -253,8 +255,52 @@ def parse_expense_form(form) -> dict:
         "payment_method": _payment_method(status, payment_method),
         "reverse_charge": _reverse_charge(form.get("reverse_charge")),
         "treatment": _treatment(form.get("treatment")),
+        "business_percent": _business_percent(form.get("business_percent")),  # None = 100 %
         "notes": _clean_notes(form.get("notes")),
     }
+    if values["status"] != "void" and values["business_percent"] is not None and not values["notes"]:
+        # The Aufteilungsmaßstab belongs to the record, not only its result: a share has to be
+        # explained to be verifiable (§ 4 Abs. 4 EStG, H 4.7 EStH; GoBD Rz. 50).
+        raise ArchiveError("Bei einem betrieblichen Anteil unter 100 % gehört der Aufteilungsmaßstab "
+                           "in die Notiz (wie der Anteil ermittelt wurde).")
+    return values
+
+
+def _business_percent(value: str | None) -> int | None:
+    """The share of the amount that is a Betriebsausgabe (§ 4 Abs. 4 EStG), in whole percent.
+    None for the normal case of 100 %: an expense is business unless something says otherwise,
+    and a column that stays empty keeps the record hashes of older entries valid (db.canonical)."""
+    text = (value or "").strip().removesuffix("%").strip().replace(",", ".")
+    if not text:
+        return None
+    try:
+        percent = Decimal(text)
+    except ArithmeticError:
+        raise ArchiveError("Betrieblicher Anteil ist keine Zahl.")
+    if percent != percent.to_integral_value():
+        raise ArchiveError("Betrieblicher Anteil muss eine ganze Zahl in Prozent sein.")
+    if not 0 <= percent <= FULL_BUSINESS_PERCENT:
+        raise ArchiveError("Betrieblicher Anteil muss zwischen 0 und 100 Prozent liegen.")
+    return None if percent == FULL_BUSINESS_PERCENT else int(percent)
+
+
+def business_percent(value: int | None) -> int:
+    """The stored share as a number, with the empty column read as fully business."""
+    return FULL_BUSINESS_PERCENT if value is None else value
+
+
+def deductible_cents(amount_cents: int | None, percent: int | None) -> int:
+    """The part of an expense that counts as a Betriebsausgabe, rounded to the cent."""
+    if not amount_cents:
+        return 0
+    share = Decimal(amount_cents) * business_percent(percent) / 100
+    return int(share.quantize(Decimal("1"), "ROUND_HALF_UP"))
+
+
+def deductible_sql(column: str = "amount_cents") -> str:
+    """The same calculation in SQL, per row: integer division after +50 rounds half up, which is
+    exact because amounts are positive whole cents. An empty share is a full one."""
+    return f"(({column} * COALESCE(business_percent, {FULL_BUSINESS_PERCENT}) + 50) / 100)"
 
 
 def _treatment(value: str | None) -> str:
@@ -308,6 +354,8 @@ def _iso(d: date | None) -> str | None:
 
 
 def _show(field: str, value) -> str:
+    if field == "business_percent":
+        return f"{business_percent(value)} %"
     if value in (None, ""):
         return "–"
     if field == "amount_cents":
@@ -380,9 +428,11 @@ def cash_summary(conn: sqlite3.Connection, year: str = "") -> dict:
         "SELECT COALESCE(SUM(amount_cents), 0) FROM invoices WHERE kind = 'cancellation' AND status = 'paid'"
         " AND paid_date IS NOT NULL" + in_year, params,
     ).fetchone()[0]
-    spent, assets = conn.execute(
-        "SELECT COALESCE(SUM(CASE WHEN treatment = '' THEN amount_cents END), 0),"
-        " COALESCE(SUM(CASE WHEN treatment = ? THEN amount_cents END), 0)"
+    deductible = deductible_sql()
+    spent, assets, paid_out = conn.execute(
+        f"SELECT COALESCE(SUM(CASE WHEN treatment = '' THEN {deductible} END), 0),"
+        f" COALESCE(SUM(CASE WHEN treatment = ? THEN {deductible} END), 0),"
+        " COALESCE(SUM(amount_cents), 0)"
         " FROM expenses WHERE status = 'paid'"
         + (f" AND substr({booking_date_sql()}, 1, 4) = ?" if year_ok else ""),
         (ASSET, year) if year_ok else (ASSET,),
@@ -390,9 +440,11 @@ def cash_summary(conn: sqlite3.Connection, year: str = "") -> dict:
     to_review = conn.execute(
         "SELECT COUNT(*) FROM expenses WHERE reviewed = 0 AND status != 'void'").fetchone()[0]
     # Assets are not deductible at once; their AfA is calculated outside the tool, so the surplus
-    # shown here is before AfA.
+    # shown here is before AfA. Expenses and assets are the business share of what was paid;
+    # `private` is the rest, which reconciles the two against the bank account.
     return {"year": year if year_ok else "", "income": income, "refunds": refunds, "expenses": spent,
-            "assets": assets, "surplus_before_afa": income - refunds - spent, "to_review": to_review,
+            "assets": assets, "private": paid_out - spent - assets,
+            "surplus_before_afa": income - refunds - spent, "to_review": to_review,
             "reverse_charge": reverse_charge_summary(conn, int(year) if year_ok else date.today().year)}
 
 
@@ -405,7 +457,11 @@ def reverse_charge_date_sql() -> str:
 
 def reverse_charge_summary(conn: sqlite3.Connection, year: int) -> dict:
     """Tax base of § 13b purchases per quarter of one year, plus 19 % as an orientation value.
-    Open and paid expenses count (the tax does not depend on payment), voided ones do not."""
+    Open and paid expenses count (the tax does not depend on payment), voided ones do not.
+
+    The full amount is the tax base, not the business share: the tax is owed on the Entgelt of the
+    supply received (§ 13b Abs. 1 and 2, § 10 Abs. 1 UStG); a private share reduces the income tax
+    deduction, not the VAT the recipient owes."""
     day = reverse_charge_date_sql()
     quarters = {q: 0 for q in (1, 2, 3, 4)}
     count = 0

@@ -39,6 +39,7 @@ Numbers are stable; they are referenced from PRs, code comments and the question
 | 21 | Hotfix: cancelling a paid invoice erased the receipt | done: refused, and older cases are reported |
 | 22 | External receipts for the § 19 limits | done: append-only table, counted by the monitor |
 | 23 | § 13b in foreign currency | done: hint pointing to the BMF average rate (§ 16 Abs. 6 UStG) |
+| 25 | Business share of mixed expenses | done: percentage per document, only that share is deducted |
 
 ## What is open
 
@@ -129,6 +130,7 @@ Programmidentität. Rules that follow:
 | 22 | External receipts for the § 19 limits | done (`gobd/external-receipts`) |
 | 21 | Hotfix: cancelling a paid invoice erased the receipt | done (`fix/paid-cancellation`); paid → cancelled refused, lost receipts reported |
 | 9 | Cancellation document | done (`gobd/cancellation`), see [CANCELLATION.md](CANCELLATION.md) |
+| 25 | Business share of mixed expenses (§ 4 Abs. 4 EStG) | done (`feat/business-share`); reason required, § 13b base unchanged |
 
 ## Questions for the Steuerberater
 
@@ -157,7 +159,13 @@ questions are kept privately outside this repository.
    cancellation document required for a Kleinunternehmer, or does the status plus reason suffice?
    Does the customer's bookkeeping prefer the title "Rechnungskorrektur" over "Stornorechnung"?
    (#9, CANCELLATION.md)
-7. **Refunds and the Gesamtumsatz.** If a paid invoice is cancelled and the money refunded, does the
+7. **Splitting mixed expenses.** An expense can be recorded with a business share below 100 %, and
+   only that share is deducted; the Aufteilungsmaßstab is required in the note. Is a share estimated
+   by the taxpayer acceptable for the kinds of expense that occur here (subscriptions used privately
+   as well), and which of them fall under the Aufteilungsverbot of § 12 Nr. 1 EStG and may not be
+   split at all? Is the full amount correct as the § 13b tax base when the service is only partly
+   business? (#25)
+8. **Refunds and the Gesamtumsatz.** If a paid invoice is cancelled and the money refunded, does the
    refund reduce the § 19 turnover of the refund year, of the receipt year, or not at all? The tool
    subtracts nothing from the turnover and shows the refund separately in the cash overview, where
    it counts in the year it is paid out. (#9, #20, #21)

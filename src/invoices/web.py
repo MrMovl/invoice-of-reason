@@ -582,6 +582,7 @@ def expense_detail(expense_id: int, form=None):
     return render_template("expense.html", exp=row, form=form, events=events, problem=problem,
                            asset_hint=expenses.asset_hint(_hint_values(form)),
                            gwg_limit=expenses.GWG_LIMIT_NET_CENTS,
+                           deductible=expenses.deductible_cents(row["amount_cents"], row["business_percent"]),
                            suggestion=suggestion, suggestion_sources=SUGGESTION_SOURCES,
                            invoice=invoice, invoice_error=invoice_error,
                            review_late=expenses.review_overdue(row), review_days=expenses.REVIEW_DAYS,
