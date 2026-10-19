@@ -39,7 +39,7 @@ Alle Zeitstempel (`created_at`, `updated_at`, `at`) sind UTC im Format ISO 8601
 | `service_date` | Leistungsdatum/-zeitraum wie gedruckt (`16.09.2026` oder `01.09.2026 bis 15.09.2026`) | nein |
 | `due_date` | Fälligkeit | nein |
 | `customer_name`, `customer_street`, `customer_city` | Kunde wie auf der Rechnung | nein |
-| `title`, `description` | Leistung | nein |
+| `title`, `description` | Leistung. Bei mehreren Positionen: `title` die Titel der Positionen, durch `; ` getrennt und auf 200 Zeichen gekürzt, `description` die nummerierte Liste der Positionen mit ihren Beträgen. Die Positionen selbst stehen unverändert in `payload_json` und auf der PDF | nein |
 | `amount_cents` | Rechnungsbetrag in Cent; bei einer Stornorechnung negativ (Betrag der stornierten Rechnung) | nein |
 | `status` | Ausgangsrechnung: `open` offen, `paid` bezahlt, `cancelled` storniert. Stornorechnung: Stand der Erstattung, `cancelled` = keine Erstattung (Rechnung war unbezahlt), `open` = Erstattung offen, `paid` = erstattet | ja, protokolliert |
 | `paid_date` | Zahlungseingang; bei einer Stornorechnung der Tag der Erstattung. Eine durch Stornorechnung stornierte Rechnung behält ihren Zahlungseingang | ja, protokolliert |
@@ -48,7 +48,7 @@ Alle Zeitstempel (`created_at`, `updated_at`, `at`) sind UTC im Format ISO 8601
 | `source` | `generated` im Programm erstellt, `imported` vor Einführung des Programms erstellt, Original-PDF unverändert übernommen (Teil 2.9) | nein |
 | `pdf_path` | Pfad unter `data/archive/` | nein |
 | `pdf_sha256`, `pdf_size` | Prüfsumme und Größe der PDF | nein |
-| `payload_json` | erstellt: vollständige Eingabedaten, Absenderdaten (Name, Anschrift, Steuernummer, Bankverbindung) und die fest gedruckten Texte (`texts.small_business_note`, ab 18.09.2026) zum Erstellungszeitpunkt; importiert: Grund, ursprünglicher Dateiname, bestätigte Hinweise, Programmversion (Absenderdaten stehen nur in der Original-PDF) | nein |
+| `payload_json` | erstellt: vollständige Eingabedaten einschließlich aller Rechnungspositionen (`invoice.items`: je Position Titel, Beschreibung und Betrag) und des Gesamtbetrags (`invoice.amount`), Absenderdaten (Name, Anschrift, Steuernummer, Bankverbindung) und die fest gedruckten Texte (`texts.small_business_note`, ab 18.09.2026) zum Erstellungszeitpunkt; importiert: Grund, ursprünglicher Dateiname, bestätigte Hinweise, Programmversion (Absenderdaten stehen nur in der Original-PDF) | nein |
 | `retain_until` | Frühestes Ende der Aufbewahrung (31.12. des Rechnungsjahres + eingestellte Jahre), Mindestfrist (3.6) | nein |
 | `created_at`, `updated_at` | Erfassung, letzte Änderung | `updated_at` ja |
 

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_invoice_items.html" import item_row %}
 {% block title %}Neue Rechnung{% endblock %}
 {% block content %}
 <h1>Neue Rechnung</h1>
@@ -35,17 +36,17 @@
   {% include "_customer_fields.html" %}
 
   <fieldset>
-    <legend>Leistung</legend>
-    <label class="span-2">Titel
-      <input name="title" value="{{ form.title or '' }}" maxlength="200" required>
-    </label>
-    <label class="span-2">Beschreibung
-      <textarea name="description" rows="4" maxlength="1000">{{ form.description or '' }}</textarea>
-    </label>
-    <label>Betrag in €
-      <input name="amount" value="{{ form.amount or '' }}" inputmode="decimal" placeholder="700,00" required>
-    </label>
-    <p class="hint">Kleinunternehmer nach § 19 UStG, keine Umsatzsteuer.</p>
+    <legend>Leistungen</legend>
+    <div class="span-2 items" id="items">
+      {% for item in items %}{{ item_row(item, loop.index) }}{% endfor %}
+    </div>
+    <template id="item-template">{{ item_row() }}</template>
+    <div class="span-2 items-foot">
+      <button class="btn" type="button" id="item-add" hidden>Position hinzufügen</button>
+      <p class="items-total" id="items-total" hidden></p>
+    </div>
+    <p class="hint span-2">Kleinunternehmer nach § 19 UStG, keine Umsatzsteuer. Mehrere Positionen
+      werden einzeln mit ihrem Betrag gedruckt, darunter der Gesamtbetrag.</p>
     <details class="span-2 number-override" {{ 'open' if form.limit_override }}>
       <summary>Trotz Umsatzgrenze erstellen</summary>
       <label class="check"><input type="checkbox" name="limit_override" value="1" {{ 'checked' if form.limit_override }}> Trotz Umsatzgrenze als Rechnung nach § 19 UStG erstellen</label>

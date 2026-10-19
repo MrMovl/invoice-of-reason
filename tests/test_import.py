@@ -99,7 +99,6 @@ def test_same_file_cannot_be_archived_twice(store):
 
 @pytest.mark.parametrize("overrides,message", [
     ({"reason": " "}, "Grund für den Import fehlt"),
-    ({"issue_date": (date.today() + timedelta(days=1)).isoformat()}, "Zukunft"),
     ({"due_date": "2026-09-01"}, "vor dem Rechnungsdatum"),
     ({"amount": "0"}, "größer als 0"),
     ({"service_date": ""}, "Leistungsdatum fehlt"),
@@ -107,6 +106,15 @@ def test_same_file_cannot_be_archived_twice(store):
 def test_invalid_input_is_rejected(overrides, message):
     with pytest.raises(archive.ArchiveError, match=message):
         invoice_import.parse_import({**VALUES, **overrides})
+
+
+def test_a_future_issue_date_is_rejected():
+    # Both dates are read when the test runs, not when it is collected: a run that crosses
+    # midnight would otherwise import a date that is no longer in the future.
+    tomorrow = date.today() + timedelta(days=1)
+    with pytest.raises(archive.ArchiveError, match="Zukunft"):
+        invoice_import.parse_import({**VALUES, "issue_date": tomorrow.isoformat(),
+                                     "due_date": (tomorrow + timedelta(days=14)).isoformat()})
 
 
 @pytest.mark.parametrize("pdf,message", [(b"", "leer"), (b"<html>", "keine PDF")])

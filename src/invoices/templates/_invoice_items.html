@@ -1,0 +1,17 @@
+{% macro item_row(item={}, index=1) %}
+<fieldset class="item" data-item>
+  <legend>Position <span data-item-number>{{ index }}</span></legend>
+  <label class="span-2">Titel
+    <input name="item_title" value="{{ item.title or '' }}" maxlength="200" required>
+  </label>
+  <label class="span-2">Beschreibung
+    <textarea name="item_description" rows="3" maxlength="1000">{{ item.description or '' }}</textarea>
+  </label>
+  <label>Betrag in €
+    <input name="item_amount" value="{{ item.amount or '' }}" inputmode="decimal" placeholder="700,00" required data-item-amount>
+  </label>
+  <div class="item-actions">
+    <button class="btn btn-link" type="button" data-item-remove hidden>Position entfernen</button>
+  </div>
+</fieldset>
+{% endmacro %}

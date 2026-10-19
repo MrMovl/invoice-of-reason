@@ -18,11 +18,22 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from . import db
-from .pdf import SMALL_BUSINESS_NOTE, InvoiceData, Sender, format_date, render_invoice
+from .pdf import (
+    SMALL_BUSINESS_NOTE,
+    InvoiceData,
+    LineItem,
+    Sender,
+    format_amount,
+    format_date,
+    render_invoice,
+)
 
 NUMBER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
 SCHEME_RE = re.compile(r"^(\d{4})-(\d{3,})$")
 MAX_AMOUNT = Decimal("10000000")
+# Positions flow onto further pages, but an invoice with more than this is a different kind of
+# document: a sanity bound on the form, not a layout limit.
+MAX_ITEMS = 20
 
 
 class ArchiveError(ValueError):
@@ -228,11 +239,14 @@ class InvoiceInput:
     customer_name: str
     customer_street: str
     customer_city: str
-    title: str
-    description: str
-    amount: Decimal
+    items: tuple[LineItem, ...]
     number_reason: str = ""  # why a number outside the running sequence is used on purpose
     limit_reason: str = ""  # why a § 19 invoice is issued although the turnover limit check objects
+
+    @property
+    def amount(self) -> Decimal:
+        """The invoice total, the sum of its positions."""
+        return sum((item.amount for item in self.items), Decimal(0))
 
     def to_invoice_data(self) -> InvoiceData:
         service = format_date(self.service_from)
@@ -247,10 +261,47 @@ class InvoiceInput:
             customer_name=self.customer_name,
             customer_street=self.customer_street,
             customer_city=self.customer_city,
-            title=self.title,
-            description=self.description,
-            amount=self.amount,
+            items=self.items,
         )
+
+
+def items_title(items: tuple[LineItem, ...]) -> str:
+    """The `title` column of the invoice row: the position title, several joined. The positions
+    themselves stay in payload_json and on the PDF; this column is for lists and the search."""
+    text = "; ".join(item.title for item in items)
+    return text if len(text) <= 200 else text[:199].rstrip() + "…"
+
+
+def items_description(items: tuple[LineItem, ...]) -> str:
+    """The `description` column: the description of a single position, or all positions with their
+    amounts, so the record stays readable without parsing payload_json."""
+    if len(items) == 1:
+        return items[0].description
+    lines = []
+    for number, item in enumerate(items, start=1):
+        lines.append(f"{number}. {item.title} – {format_amount(item.amount)}")
+        lines += [f"   {line}" for line in item.description.split("\n") if item.description]
+    return "\n".join(lines)
+
+
+def payload_items(row) -> list[dict]:
+    """The positions as recorded in payload_json, each with its amount in cents for display.
+    Empty for imported invoices and for invoices created before an invoice could have more than
+    one position."""
+    try:
+        payload = json.loads(row["payload_json"] or "{}")
+    except (TypeError, ValueError):
+        return []
+    items = []
+    for item in payload.get("invoice", {}).get("items") or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            cents = int(Decimal(str(item.get("amount", "0"))) * 100)
+        except InvalidOperation:
+            cents = 0
+        items.append({**item, "amount_cents": cents})
+    return items
 
 
 def _clean(value: str | None, label: str, max_len: int, required: bool = True) -> str:
@@ -276,6 +327,47 @@ def parse_date(value: str | None, label: str, required: bool = True) -> date | N
         raise ArchiveError(f"{label} ist kein gültiges Datum.") from None
 
 
+def form_list(form, name: str) -> list[str]:
+    """All values of a repeated form field, also from a plain dict (tests, CLI)."""
+    if hasattr(form, "getlist"):
+        return form.getlist(name)
+    value = form.get(name)
+    if value is None:
+        return []
+    return list(value) if isinstance(value, (list, tuple)) else [value]
+
+
+def parse_items(form) -> tuple[LineItem, ...]:
+    """The positions from the repeated fields item_title, item_description and item_amount.
+    At least one is needed; rows left completely empty are ignored, so an added row may stay blank."""
+    titles = form_list(form, "item_title")
+    descriptions = form_list(form, "item_description")
+    amounts = form_list(form, "item_amount")
+    rows = max(len(titles), len(descriptions), len(amounts))
+    if rows > MAX_ITEMS:
+        raise ArchiveError(f"Mehr als {MAX_ITEMS} Positionen passen nicht auf eine Rechnung.")
+    items = []
+    for i in range(rows):
+        title = titles[i] if i < len(titles) else ""
+        description = descriptions[i] if i < len(descriptions) else ""
+        amount = amounts[i] if i < len(amounts) else ""
+        if not (title.strip() or description.strip() or amount.strip()):
+            continue
+        # With a single position the messages stay as they are; with several they name the row.
+        prefix = "" if rows == 1 else f"Position {i + 1}: "
+        try:
+            items.append(LineItem(
+                title=_clean(title, "Leistungstitel", 200),
+                description=_clean(description, "Beschreibung", 1000, required=False),
+                amount=parse_amount(amount),
+            ))
+        except ArchiveError as e:
+            raise ArchiveError(f"{prefix}{e}") from None
+    if not items:
+        raise ArchiveError("Die Rechnung braucht mindestens eine Position.")
+    return tuple(items)
+
+
 def parse_invoice_form(form) -> InvoiceInput:
     issue_date = parse_date(form.get("issue_date"), "Rechnungsdatum")
     service_from = parse_date(form.get("service_from"), "Leistungsdatum")
@@ -297,9 +389,7 @@ def parse_invoice_form(form) -> InvoiceInput:
         customer_name=_clean(form.get("customer_name"), "Kunde", 80),
         customer_street=_clean(form.get("customer_street"), "Straße", 80),
         customer_city=_clean(form.get("customer_city"), "PLZ und Ort", 80),
-        title=_clean(form.get("title"), "Leistungstitel", 200),
-        description=_clean(form.get("description"), "Beschreibung", 1000, required=False),
-        amount=parse_amount(form.get("amount") or ""),
+        items=parse_items(form),
         number_reason=_number_reason(form),
         limit_reason=_limit_reason(form),
     )
@@ -347,7 +437,12 @@ def issue_invoice(
     pdf = render_invoice(data, sender)
     rel_path = f"{data.issue_date.year}/{pdf_filename(number, data.customer_name)}"
     payload = {
-        "invoice": {k: str(v) for k, v in asdict(data).items()},
+        "invoice": {
+            **{k: str(v) for k, v in asdict(data).items() if k != "items"},
+            "amount": str(data.amount),
+            "items": [{"title": i.title, "description": i.description, "amount": str(i.amount)}
+                      for i in data.items],
+        },
         "sender": asdict(sender),
         # Fixed texts printed on this PDF; they change over time (e.g. the § 19 note in 2026).
         "texts": {"small_business_note": SMALL_BUSINESS_NOTE},
@@ -366,8 +461,8 @@ def issue_invoice(
             "customer_name": data.customer_name,
             "customer_street": data.customer_street,
             "customer_city": data.customer_city,
-            "title": data.title,
-            "description": data.description,
+            "title": items_title(data.items),
+            "description": items_description(data.items),
             "amount_cents": int(data.amount * 100),
             "payload_json": json.dumps(payload, ensure_ascii=False, sort_keys=True),
             "retain_until": retain_until(data.issue_date, retention_years).isoformat(),
@@ -578,15 +673,21 @@ def cancel_invoice(
     data = InvoiceData(
         number=number, issue_date=issue_date, service_date=orig["service_date"], due_date=issue_date,
         payment_days=0, customer_name=orig["customer_name"], customer_street=orig["customer_street"],
-        customer_city=orig["customer_city"], title=f"Storno: {orig['title']}", description="",
-        amount=-Decimal(orig["amount_cents"]) / 100,
+        customer_city=orig["customer_city"],
+        items=(LineItem(title=f"Storno: {orig['title']}", description="",
+                        amount=(-Decimal(orig["amount_cents"]) / 100).quantize(Decimal("0.01"))),),
     )
     info = Cancellation(original_number=orig["number"], original_date=original_date, refund=refund,
                         small_business_note=note)
     pdf = render_invoice(data, sender, cancellation=info)
     rel_path = f"{issue_date.year}/Stornorechnung_{number}_{slugify(orig['customer_name'])}.pdf"
     payload = {
-        "invoice": {k: str(v) for k, v in asdict(data).items()},
+        "invoice": {
+            **{k: str(v) for k, v in asdict(data).items() if k != "items"},
+            "amount": str(data.amount),
+            "items": [{"title": i.title, "description": i.description, "amount": str(i.amount)}
+                      for i in data.items],
+        },
         "sender": asdict(sender),
         "texts": {"small_business_note": note, "reference": info.reference},
         "cancels": {"id": orig["id"], "number": orig["number"], "issue_date": orig["issue_date"],
@@ -611,7 +712,7 @@ def cancel_invoice(
             "customer_name": orig["customer_name"],
             "customer_street": orig["customer_street"],
             "customer_city": orig["customer_city"],
-            "title": data.title,
+            "title": items_title(data.items),
             "description": info.reference,
             "amount_cents": -orig["amount_cents"],
             "status": "open" if refund else "cancelled",

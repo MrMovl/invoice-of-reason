@@ -50,6 +50,7 @@ RM = 20 * mm
 CW = W - LM - RM  # ~155mm usable
 FOOT_H = 26 * mm
 WAVE_ZONE_Y = FOOT_H + 22 * mm  # top of footer wave transition zone
+FLOOR = WAVE_ZONE_Y + 6 * mm  # lowest point content may reach
 
 # § 34a Nr. 5 UStDV: an invoice of a Kleinunternehmer must state that the exemption for small
 # businesses applies. Since 2025 § 19 UStG is a tax exemption; wording in use from 2026-09-18,
@@ -60,6 +61,32 @@ SMALL_BUSINESS_NOTE = (
 )
 OLD_SMALL_BUSINESS_NOTE = "Gemäß § 19 UStG wird keine Umsatzsteuer berechnet."
 NOTE_FONT, NOTE_SIZE, NOTE_LEADING = "Lora-Italic", 8.5, 12
+
+
+@dataclass(frozen=True)
+class Rhythm:
+    """Vertical spacing of the page. A one-position invoice keeps the original, roomy rhythm. An
+    invoice with several positions moves the fixed blocks closer together and sets the positions
+    themselves tighter, so a short list of positions still fits on one page before the layout
+    continues on the next one."""
+
+    after_recipient: float
+    after_title: float
+    meta_row: float
+    after_meta: float
+    item_head: float  # from the top of a position to its title baseline
+    item_foot: float  # below the last line of a position
+    item_gap: float   # between two positions
+    after_note: float
+    block_head: float  # below "Bankverbindung" resp. "Hinweis"
+
+
+ROOMY = Rhythm(after_recipient=12 * mm, after_title=9 * mm, meta_row=7 * mm, after_meta=10 * mm,
+               item_head=6 * mm, item_foot=4 * mm, item_gap=2 * mm, after_note=14 * mm,
+               block_head=7 * mm)
+TIGHT = Rhythm(after_recipient=10 * mm, after_title=7 * mm, meta_row=6.5 * mm, after_meta=7 * mm,
+               item_head=4.5 * mm, item_foot=2 * mm, item_gap=1 * mm, after_note=11 * mm,
+               block_head=6 * mm)
 
 
 class FontsMissingError(RuntimeError):
@@ -93,6 +120,15 @@ class Sender:
 
 
 @dataclass(frozen=True)
+class LineItem:
+    """One position of an invoice: what was done and what it costs."""
+
+    title: str
+    description: str
+    amount: Decimal
+
+
+@dataclass(frozen=True)
 class InvoiceData:
     number: str
     issue_date: date
@@ -102,9 +138,12 @@ class InvoiceData:
     customer_name: str
     customer_street: str
     customer_city: str
-    title: str
-    description: str
-    amount: Decimal
+    items: tuple[LineItem, ...]
+
+    @property
+    def amount(self) -> Decimal:
+        """The total, the sum of all positions."""
+        return sum((item.amount for item in self.items), Decimal(0))
 
 
 @dataclass(frozen=True)
@@ -221,14 +260,100 @@ def draw_note(c, text: str, baseline: float) -> float:
     return height - NOTE_LEADING
 
 
+def para_height(c, text: str, max_w: float, style) -> float:
+    """Height the text will take, without drawing it: for the page-break decision."""
+    return Paragraph(text, style).wrapOn(c, max_w, 9999)[1]
+
+
+def note_extra_height(c, text: str) -> float:
+    """What draw_note will take beyond a single line."""
+    if c.stringWidth(text, NOTE_FONT, NOTE_SIZE) <= CW:
+        return 0
+    style = ParagraphStyle("note", fontName=NOTE_FONT, fontSize=NOTE_SIZE, textColor=MGRAY,
+                           leading=NOTE_LEADING)
+    return para_height(c, _para_text(text), CW, style) - NOTE_LEADING
+
+
 def _para_text(text: str) -> str:
     """Paragraph parses markup, so user text is escaped and newlines kept."""
     return escape(text.strip()).replace("\n", "<br/>")
 
 
+def _background(c) -> None:
+    c.setFillColor(BG)
+    c.rect(0, 0, W, H, fill=1, stroke=0)
+
+
+def _footer(c, sender: Sender) -> None:
+    """Footer waves and the dark block with the sender line; drawn on every page."""
+    draw_footer_waves(c, 0, WAVE_ZONE_Y, W, n=4, amp=4.0, wl=32 * mm, gap=5)
+
+    # Dark teal footer block
+    c.setFillColor(TEAL)
+    c.rect(0, 0, W, FOOT_H, fill=1, stroke=0)
+
+    # Footer content
+    c.setFillColor(WHITE)
+    c.setFont("Lora", 9)
+    c.drawCentredString(W / 2, FOOT_H / 2 + 4.5 * mm, f"{sender.name}  ·  {sender.tagline}")
+    c.setFont("Poppins-Light", 6.5)
+    c.setFillColor(FOOT_SUBTEXT)
+    c.drawCentredString(
+        W / 2,
+        FOOT_H / 2 - 0.5 * mm,
+        f"{sender.address}  ·  Steuernummer: {sender.tax_number}",
+    )
+    c.drawCentredString(W / 2, FOOT_H / 2 - 5.5 * mm, sender.contact)
+
+
+def _next_page(c, sender: Sender, doc_title: str, number: str, page: int) -> float:
+    """Close the current page and open the next one. Its head names the document and the page, so
+    a printed sheet on its own stays identifiable. Returns the cursor below the head."""
+    _footer(c, sender)
+    c.showPage()
+    _background(c)
+    cur = H - 15 * mm
+    c.setFillColor(TEAL)
+    c.setFont("Lora", 11)
+    c.drawString(LM, cur, f"{doc_title} {number}")
+    c.setFillColor(MGRAY)
+    c.setFont("Poppins-Light", 7.5)
+    c.drawRightString(W - RM, cur, f"Seite {page}")
+    cur -= 5 * mm
+    draw_waves(c, LM, cur, CW, n=2)
+    return cur - 11 * mm
+
+
+def _items_head(c, cur: float, caption: bool) -> float:
+    """The "Leistungen" caption (first page only) and the table header, repeated on every page."""
+    if caption:
+        c.setFillColor(GOLD)
+        c.setFont("Lora-Italic", 10)
+        c.drawString(LM, cur, "Leistungen")
+        cur -= 6 * mm
+
+    # Table header
+    c.setFillColor(TEAL)
+    c.rect(LM, cur - 8 * mm, CW, 8 * mm, fill=1, stroke=0)
+    c.setFillColor(WHITE)
+    c.setFont("Poppins", 7.5)
+    c.drawString(LM + 3 * mm, cur - 5.5 * mm, "Beschreibung")
+    c.drawRightString(W - RM - 3 * mm, cur - 5.5 * mm, "Betrag")
+    return cur - 8 * mm
+
+
+def _closing_height(r: Rhythm, note_extra: float, cancellation: bool) -> float:
+    """From below the last position to the last line of the closing block (total, § 19 note and
+    bank details or the cancellation note). They always stay together on one page."""
+    total_block = 7 * mm + 8 * mm + 9 * mm
+    closing = r.block_head + (5 * mm if cancellation else 15 * mm)
+    return total_block + note_extra + r.after_note + closing
+
+
 def render_invoice(data: InvoiceData, sender: Sender, cancellation: Cancellation | None = None) -> bytes:
     """Render the invoice, or with `cancellation` its Stornorechnung, and return the PDF bytes."""
     register_fonts()
+    r = ROOMY if len(data.items) == 1 else TIGHT
     buf = io.BytesIO()
     c = rl_canvas.Canvas(buf, pagesize=A4, invariant=1)
     doc_title = "Stornorechnung" if cancellation else "Rechnung"
@@ -237,9 +362,7 @@ def render_invoice(data: InvoiceData, sender: Sender, cancellation: Cancellation
     c.setSubject(f"{doc_title} {data.number} an {data.customer_name}")
     c.setCreator("invoice-of-reason")
 
-    # Background
-    c.setFillColor(BG)
-    c.rect(0, 0, W, H, fill=1, stroke=0)
+    _background(c)
 
     cur = H - 15 * mm  # running cursor (top → down)
 
@@ -295,7 +418,7 @@ def render_invoice(data: InvoiceData, sender: Sender, cancellation: Cancellation
         cur -= 5.5 * mm
         c.drawString(LM, cur, line)
 
-    cur -= 12 * mm
+    cur -= r.after_recipient
 
     # ── RECHNUNG TITLE ────────────────────────────────────────────────────
     c.setFillColor(TEAL)
@@ -307,7 +430,7 @@ def render_invoice(data: InvoiceData, sender: Sender, cancellation: Cancellation
     c.setStrokeColor(GOLD)
     c.setLineWidth(1.2)
     c.line(LM, cur, W - RM, cur)
-    cur -= 9 * mm
+    cur -= r.after_title
 
     if cancellation:
         # The reference to the original, directly under the title (GoBD Rz. 64).
@@ -336,7 +459,7 @@ def render_invoice(data: InvoiceData, sender: Sender, cancellation: Cancellation
                 False,
             ),
         ]
-    row_h = 7 * mm
+    row_h = r.meta_row
     for label, value, shaded in meta_rows:
         if shaded:
             c.setFillColor(ROWBG)
@@ -350,57 +473,74 @@ def render_invoice(data: InvoiceData, sender: Sender, cancellation: Cancellation
         c.drawString(LM + 70 * mm, cur - 4.5 * mm, value)
         cur -= row_h
 
-    cur -= 10 * mm
+    cur -= r.after_meta
 
     # ── LEISTUNGEN ────────────────────────────────────────────────────────
-    c.setFillColor(GOLD)
-    c.setFont("Lora-Italic", 10)
-    c.drawString(LM, cur, "Leistungen")
-    cur -= 6 * mm
+    cur = _items_head(c, cur, caption=True)
 
-    # Table header
-    c.setFillColor(TEAL)
-    c.rect(LM, cur - 8 * mm, CW, 8 * mm, fill=1, stroke=0)
-    c.setFillColor(WHITE)
-    c.setFont("Poppins", 7.5)
-    c.drawString(LM + 3 * mm, cur - 5.5 * mm, "Beschreibung")
-    c.drawRightString(W - RM - 3 * mm, cur - 5.5 * mm, "Betrag")
-    cur -= 8 * mm
-
-    # Position
+    # Positions, one block each, separated by a thin rule. They flow onto further pages; the
+    # closing block follows the last position, on its own page if it no longer fits.
     title_style = ParagraphStyle(
         "pt", fontName="Lora", fontSize=9, textColor=TEAL, leading=13
     )
     desc_style = ParagraphStyle(
         "pd", fontName="Lora-Italic", fontSize=8.5, textColor=MGRAY, leading=12.5
     )
+    note = cancellation.small_business_note if cancellation else SMALL_BUSINESS_NOTE
+    closing_h = _closing_height(r, note_extra_height(c, note), bool(cancellation))
+    page, on_page = 1, 0
 
-    title_h = draw_para(
-        c, _para_text(data.title), LM + 3 * mm, cur - 6 * mm, CW - 45 * mm, title_style
-    )
-    desc_h = 0
-    if data.description.strip():
-        desc_h = draw_para(
-            c,
-            _para_text(data.description),
-            LM + 3 * mm,
-            cur - 7.5 * mm - title_h,
-            CW - 45 * mm,
-            desc_style,
-        )
+    for item in data.items:
+        title_h = para_height(c, _para_text(item.title), CW - 45 * mm, title_style)
+        desc_h = (para_height(c, _para_text(item.description), CW - 45 * mm, desc_style)
+                  if item.description.strip() else 0)
+        pos_h = r.item_head + title_h + desc_h + r.item_foot
+        if cur - pos_h < FLOOR:
+            if on_page or page == 1:
+                # What is left of this page is too little: continue on the next one.
+                page += 1
+                cur = _items_head(c, _next_page(c, sender, doc_title, data.number, page),
+                                  caption=False)
+                on_page = 0
+            if cur - pos_h < FLOOR:
+                # Nothing but the page head above it: longer than a whole page.
+                raise LayoutOverflowError(
+                    "Eine Position ist zu lang für eine Seite. Bitte Titel und Beschreibung kürzen "
+                    "oder die Position aufteilen."
+                )
+        if on_page:
+            c.setStrokeColor(LWAV)
+            c.setLineWidth(0.4)
+            c.line(LM + 3 * mm, cur, W - RM - 3 * mm, cur)
+        draw_para(c, _para_text(item.title), LM + 3 * mm, cur - r.item_head, CW - 45 * mm, title_style)
+        if item.description.strip():
+            draw_para(
+                c,
+                _para_text(item.description),
+                LM + 3 * mm,
+                cur - r.item_head - 1.5 * mm - title_h,
+                CW - 45 * mm,
+                desc_style,
+            )
+        # Amount right-aligned, centred vertically in row
+        c.setFillColor(TEAL)
+        c.setFont("Lora", 9)
+        c.drawRightString(W - RM - 3 * mm, cur - pos_h / 2, format_amount(item.amount))
+        cur -= pos_h + r.item_gap
+        on_page += 1
 
-    pos_h = 6 * mm + title_h + desc_h + 4 * mm
+    own_page = cur - closing_h < FLOOR - 5 * mm
+    if own_page:
+        page += 1
+        cur = _next_page(c, sender, doc_title, data.number, page)
+
     amount_text = format_amount(data.amount)
-    # Amount right-aligned, centred vertically in row
-    c.setFillColor(TEAL)
-    c.setFont("Lora", 9)
-    c.drawRightString(W - RM - 3 * mm, cur - pos_h / 2, amount_text)
-    cur -= pos_h + 2 * mm
 
-    # Separator line
-    c.setStrokeColor(LWAV)
-    c.setLineWidth(0.5)
-    c.line(LM, cur, W - RM, cur)
+    if not own_page:
+        # Separator line; on a page of its own the closing block needs no line above it.
+        c.setStrokeColor(LWAV)
+        c.setLineWidth(0.5)
+        c.line(LM, cur, W - RM, cur)
     cur -= 7 * mm
 
     # Gesamtbetrag
@@ -415,15 +555,15 @@ def render_invoice(data: InvoiceData, sender: Sender, cancellation: Cancellation
     cur -= 9 * mm
 
     # ── §19 NOTE ──────────────────────────────────────────────────────────
-    cur -= draw_note(c, cancellation.small_business_note if cancellation else SMALL_BUSINESS_NOTE, cur)
-    cur -= 14 * mm
+    cur -= draw_note(c, note, cur)
+    cur -= r.after_note
 
     if cancellation:
         # ── ERSTATTUNG / GEGENSTANDSLOS ───────────────────────────────────
         c.setFillColor(GOLD)
         c.setFont("Lora-Italic", 10)
         c.drawString(LM, cur, "Hinweis")
-        cur -= 7 * mm
+        cur -= r.block_head
         c.setFillColor(TEAL)
         c.setFont("Poppins", 8)
         if cancellation.refund:
@@ -436,7 +576,7 @@ def render_invoice(data: InvoiceData, sender: Sender, cancellation: Cancellation
         c.setFillColor(GOLD)
         c.setFont("Lora-Italic", 10)
         c.drawString(LM, cur, "Bankverbindung")
-        cur -= 7 * mm
+        cur -= r.block_head
 
         bank = [
             ("Kontoinhaber", sender.account_holder),
@@ -452,31 +592,11 @@ def render_invoice(data: InvoiceData, sender: Sender, cancellation: Cancellation
             c.drawString(LM + 28 * mm, cur, val)
             cur -= 5 * mm
 
-    # The last bank line sits at cur + 5mm; it must stay above the footer waves.
-    if cur + 5 * mm < WAVE_ZONE_Y + 6 * mm:
-        raise LayoutOverflowError(
-            "Titel und Beschreibung sind zu lang für eine Seite. Bitte kürzen."
-        )
+    # The last line of the closing block sits at cur + 5mm; it must stay above the footer waves.
+    # With the page breaks above this can only happen if a § 19 note grows beyond all measure.
+    if cur + 5 * mm < FLOOR:
+        raise LayoutOverflowError("Der Abschluss der Rechnung passt nicht auf die Seite.")
 
-    # ── FOOTER WAVES + DARK BLOCK ─────────────────────────────────────────
-    draw_footer_waves(c, 0, WAVE_ZONE_Y, W, n=4, amp=4.0, wl=32 * mm, gap=5)
-
-    # Dark teal footer block
-    c.setFillColor(TEAL)
-    c.rect(0, 0, W, FOOT_H, fill=1, stroke=0)
-
-    # Footer content
-    c.setFillColor(WHITE)
-    c.setFont("Lora", 9)
-    c.drawCentredString(W / 2, FOOT_H / 2 + 4.5 * mm, f"{sender.name}  ·  {sender.tagline}")
-    c.setFont("Poppins-Light", 6.5)
-    c.setFillColor(FOOT_SUBTEXT)
-    c.drawCentredString(
-        W / 2,
-        FOOT_H / 2 - 0.5 * mm,
-        f"{sender.address}  ·  Steuernummer: {sender.tax_number}",
-    )
-    c.drawCentredString(W / 2, FOOT_H / 2 - 5.5 * mm, sender.contact)
-
+    _footer(c, sender)
     c.save()
     return buf.getvalue()
