@@ -266,7 +266,8 @@ def _customers(conn):
     ).fetchall()
 
 
-def _new_form_defaults(conn) -> dict:
+def _new_form_defaults(conn) -> tuple[dict, list[dict]]:
+    """Prefilled form and its position rows; `?from=` copies customer and positions of an invoice."""
     today = date.today()
     form = {
         "number": archive.next_number(conn, today.year),
@@ -275,13 +276,27 @@ def _new_form_defaults(conn) -> dict:
         "service_to": "",
         "payment_days": "14",
     }
+    items = [{"title": "", "description": "", "amount": ""}]
     copy_id = request.args.get("from", type=int)
     if copy_id:
         src = conn.execute("SELECT * FROM invoices WHERE id = ? AND kind = ''", (copy_id,)).fetchone()
         if src:
-            for key in ("customer_name", "customer_street", "customer_city", "title", "description"):
+            for key in ("customer_name", "customer_street", "customer_city"):
                 form[key] = src[key]
-    return form
+            # Amounts are not copied: they are entered again on purpose.
+            copied = archive.payload_items(src) or [{"title": src["title"], "description": src["description"]}]
+            items = [{"title": i.get("title", ""), "description": i.get("description", ""), "amount": ""}
+                     for i in copied]
+    return form, items
+
+
+def _form_items(form) -> list[dict]:
+    """The position rows as entered, so a rejected form comes back filled in."""
+    keys = ("title", "description", "amount")
+    entered = {key: archive.form_list(form, f"item_{key}") for key in keys}
+    rows = max(max(len(v) for v in entered.values()), 1)
+    return [{key: entered[key][i] if i < len(entered[key]) else "" for key in keys}
+            for i in range(rows)]
 
 
 def _load_sender():
@@ -296,7 +311,9 @@ def _load_sender():
 def invoice_new():
     conn = get_db()
     _load_sender()  # fail early if the sender config is missing
-    return render_template("new.html", turnover=_turnover(conn), form=_new_form_defaults(conn), customers=_customers(conn))
+    form, items = _new_form_defaults(conn)
+    return render_template("new.html", turnover=_turnover(conn), form=form, items=items,
+                           customers=_customers(conn))
 
 
 @bp.post("/invoices/preview")
@@ -326,7 +343,8 @@ def invoice_create():
                                            founding_year=s.founding_year)
     except (archive.ArchiveError, LayoutOverflowError) as e:
         flash(str(e), "error")
-        return render_template("new.html", turnover=_turnover(conn), form=request.form, customers=_customers(conn)), 400
+        return render_template("new.html", turnover=_turnover(conn), form=request.form,
+                               items=_form_items(request.form), customers=_customers(conn)), 400
     flash("Rechnung erstellt und archiviert.", "ok")
     return redirect(url_for("web.invoice_detail", invoice_id=invoice_id))
 
@@ -346,6 +364,7 @@ def invoice_detail(invoice_id: int):
         "SELECT * FROM events WHERE invoice_id = ? ORDER BY id DESC", (invoice_id,)).fetchall()
     problem = archive.verify_invoice(settings().archive_dir, row)
     return render_template("detail.html", inv=row, events=events, problem=problem,
+                           items=archive.payload_items(row),
                            links=archive.cancellation_links(get_db(), invoice_id),
                            today=date.today().isoformat())
 

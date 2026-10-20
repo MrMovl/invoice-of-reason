@@ -51,6 +51,8 @@ def csrf(logged_in):
 
 
 def invoice_form(**overrides):
+    """The new-invoice form with one position. `title`, `description` and `amount` fill that
+    position; `item_title`, `item_description` and `item_amount` (lists) set several."""
     form = {
         "number": "2026-001",
         "issue_date": "2026-09-16",
@@ -60,12 +62,20 @@ def invoice_form(**overrides):
         "customer_name": "Nordlicht Werkstatt GmbH",
         "customer_street": "Hafenstraße 7",
         "customer_city": "24103 Kiel",
-        "title": "Entwicklung & Beratung <intern>",
-        "description": "Konzeption und Umsetzung.",
-        "amount": "700,00",
+        "item_title": "Entwicklung & Beratung <intern>",
+        "item_description": "Konzeption und Umsetzung.",
+        "item_amount": "700,00",
     }
+    for key in ("title", "description", "amount"):
+        if key in overrides:
+            form[f"item_{key}"] = overrides.pop(key)
     form.update(overrides)
     return form
+
+
+def page_count(pdf_bytes: bytes) -> int:
+    """Pages of a rendered PDF, read from the /Count of its page tree."""
+    return max(int(n) for n in re.findall(rb"/Count (\d+)", pdf_bytes))
 
 
 def make_pdf(lines: list[str]) -> bytes:

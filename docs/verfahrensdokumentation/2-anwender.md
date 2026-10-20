@@ -7,13 +7,22 @@ Beschriftungen im Programm.
 
 1. „Neue Rechnung“. Das Programm schlägt die nächste Nummer im Schema `JJJJ-NNN` vor
    (z. B. 2026-004), das Rechnungsdatum (heute) und ein Zahlungsziel von 14 Tagen.
-2. Kunde (Name, Straße, PLZ/Ort), Leistungsdatum oder -zeitraum, Leistungstitel, optionale
-   Beschreibung und Betrag eintragen. Bekannte Kunden werden vorgeschlagen; „Als Vorlage“ übernimmt
-   Kunde und Leistung einer früheren Rechnung.
+2. Kunde (Name, Straße, PLZ/Ort), Leistungsdatum oder -zeitraum und die Leistungen eintragen. Eine
+   Rechnung hat mindestens eine Position aus Titel, optionaler Beschreibung und Betrag; „Position
+   hinzufügen“ fügt weitere hinzu, „Position entfernen“ nimmt eine wieder weg. Das Formular zeigt
+   ab der zweiten Position den Gesamtbetrag. Bekannte Kunden werden vorgeschlagen; „Als Vorlage“
+   übernimmt Kunde und Leistungen einer früheren Rechnung (ohne Beträge).
 3. Optional „Vorschau“: erzeugt das PDF zur Ansicht. Vorschauen werden nicht gespeichert.
 4. „Erstellen“: Das PDF wird erzeugt, im Archiv abgelegt und mit Prüfsumme, allen Eingaben und den
    zu diesem Zeitpunkt gültigen Absenderdaten gespeichert. Ab jetzt sind Nummer, Daten, Kunde,
-   Leistung, Betrag und PDF unveränderbar.
+   Leistungen, Betrag und PDF unveränderbar.
+
+**Mehrere Positionen:** Jede Position wird mit Titel, Beschreibung und eigenem Betrag gedruckt,
+darunter der Gesamtbetrag. Passen die Positionen nicht auf eine Seite, läuft die Rechnung auf
+weiteren Seiten weiter; jede trägt oben Rechnungsnummer und Seitenzahl und wiederholt die
+Tabellenüberschrift. Gesamtbetrag, § 19-Hinweis und Bankverbindung stehen immer zusammen auf der
+letzten Seite. Der Rechnungsbetrag ist die Summe der Positionen; die Umsatzgrenze des § 19 UStG
+wird gegen diese Summe geprüft.
 
 **Hinweis auf die Kleinunternehmerregelung (§ 34a Nr. 5 UStDV):** Jede Rechnung trägt den Satz
 „Für diese Leistung gilt die Steuerbefreiung für Kleinunternehmer (§ 19 UStG). Es wird keine

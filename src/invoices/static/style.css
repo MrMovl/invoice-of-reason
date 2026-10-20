@@ -78,6 +78,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 40px var(--gutter) 64px; }
   font: 500 12px/1 var(--mono); letter-spacing: .04em; text-transform: uppercase; text-decoration: none; white-space: nowrap; cursor: pointer;
   transition: background-color .4s ease, color .4s ease, border-color .4s ease, box-shadow .4s ease, transform .25s ease; }
 .btn:hover { border-color: var(--deep); color: var(--deep); background: rgba(38, 70, 90, .05); }
+.btn[hidden] { display: none; }  /* the display above would otherwise beat the browser default */
 .btn-primary { background: var(--sand); border-color: var(--sand); color: var(--deep);
   box-shadow: 0 1px 0 rgba(15, 31, 44, .08), inset 0 1px 0 rgba(255, 255, 255, .25); }
 .btn-primary:hover { background: var(--deep); border-color: var(--deep); color: var(--white-warm);
@@ -175,6 +176,17 @@ td.num { font-family: var(--mono); font-size: 14px; }
 .badge-cancelled, .badge-void { background: rgba(26, 43, 53, .07); color: var(--soft); text-decoration: line-through; }
 .badge-overdue { background: var(--warn-bg); color: var(--warn); }
 .badge-late { background: var(--err-bg); color: var(--err); }
+
+/* Invoice positions on the new-invoice form */
+.items { display: grid; gap: 16px; }
+fieldset.item { border: 1px solid var(--rule); border-radius: var(--radius); padding: 14px 16px 18px; gap: 12px 20px; }
+fieldset.item legend { font-size: 17px; margin-bottom: 8px; padding: 0 6px; }
+.item-actions { display: flex; align-items: end; justify-content: flex-end; }
+.items-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.items-total { margin: 0; font: 350 22px var(--serif); color: var(--deep); font-variant-numeric: tabular-nums; }
+.positions { list-style: none; margin: 0; padding: 0; }
+.positions li + li { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--rule); }
+.positions .num { float: right; margin-left: 1rem; font-family: var(--mono); font-size: 14px; }
 
 /* Detail pages */
 .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; align-items: start; }

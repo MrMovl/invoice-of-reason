@@ -36,7 +36,18 @@
       <dt>Leistungsdatum</dt><dd>{{ inv.service_date }}</dd>
       <dt>Fällig</dt><dd>{{ inv.due_date|de_date or '–' }}</dd>
       <dt>Kunde</dt><dd>{{ inv.customer_name }}{% if inv.customer_street %}<br>{{ inv.customer_street }}{% endif %}{% if inv.customer_city %}<br>{{ inv.customer_city }}{% endif %}</dd>
+      {% if items|length > 1 %}
+      <dt>Leistungen</dt>
+      <dd>
+        <ul class="positions">
+          {% for item in items %}
+          <li><span class="num">{{ item.amount_cents|eur }}</span>{{ item.title }}{% if item.description %}<br><span class="muted pre">{{ item.description }}</span>{% endif %}</li>
+          {% endfor %}
+        </ul>
+      </dd>
+      {% else %}
       <dt>Leistung</dt><dd>{{ inv.title }}{% if inv.description %}<br><span class="muted pre">{{ inv.description }}</span>{% endif %}</dd>
+      {% endif %}
     </dl>
   </section>
 
