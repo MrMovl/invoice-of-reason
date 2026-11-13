@@ -109,8 +109,9 @@ def _static_version(folder: str, filename: str) -> str:
 
 @bp.app_url_defaults
 def static_cache_busting(endpoint, values):
-    # Cloudflare sets a 4 h browser cache on static files. A content hash in the URL makes
-    # every deploy fetch changed CSS/JS immediately instead of mixing new HTML with old CSS.
+    # Caddy passes the app's own cache headers through and adds none, so browsers cache static
+    # files heuristically. A content hash in the URL makes every deploy fetch changed CSS/JS
+    # immediately instead of mixing new HTML with old CSS.
     # Fonts stay unversioned: style.css loads them by plain URL, and preloads must match it.
     if endpoint == "static" and "filename" in values and "v" not in values \
             and not values["filename"].startswith("fonts/"):
@@ -186,6 +187,7 @@ def login():
             auth.login_user(username)
             return redirect(_safe_next(request.args.get("next")))
         auth.throttle.fail(key)
+        auth.log_failed_login(key)
         flash("Benutzername oder Passwort falsch.", "error")
         return render_template("login.html"), 401
     return render_template("login.html")

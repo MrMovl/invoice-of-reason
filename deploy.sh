@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Build the image off-server, ship it to the Docker host, bring the stack up.
-# The Pi never builds (920 MiB RAM); it only loads the prebuilt image.
+# The server never builds (the Pi has 920 MiB RAM); it only loads the prebuilt image.
 #
 # Usage:
 #   ./deploy.sh                                   # host=pi, path=~/invoices
+#   DEPLOY_HOST=myserver ./deploy.sh              # any other SSH host alias
 #   DEPLOY_HOST=pi DEPLOY_PATH=~/invoices ./deploy.sh
 #
 # First deploy: the server directory needs .env and config/sender.toml.

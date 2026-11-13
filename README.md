@@ -8,7 +8,7 @@ mark purchases under § 13b UStG and capital assets, record only the business sh
 expense, and watch the § 19 turnover limits.
 
 - Flask + SQLite, PDFs rendered with reportlab, expense PDFs read with `pdftotext` (poppler)
-- Runs as a Docker stack on a Raspberry Pi behind Cloudflare Tunnel
+- Runs as a Docker stack on a small Linux server behind Caddy (TLS reverse proxy)
 - UI in German
 
 See [docs/PLAN.md](docs/PLAN.md) for architecture and decisions, [docs/BACKUP.md](docs/BACKUP.md)
@@ -66,9 +66,9 @@ Data goes to `./data`, backups to `./backups` (both gitignored). `./data/dokumen
 documents that belong to the records but are not created by the program (part 6 of the
 Verfahrensdokumentation); every backup includes it.
 
-## Deployment (Raspberry Pi)
+## Deployment
 
-First time only, on the Pi:
+First time only, on the server:
 
 ```sh
 mkdir -p ~/invoices/config ~/invoices/data ~/invoices/backups
@@ -89,7 +89,9 @@ Then, from the dev machine:
 ./deploy.sh
 ```
 
-It cross-builds for the Pi's architecture, runs the test suite inside that image, ships the image
+`DEPLOY_HOST` (default `pi`) and `DEPLOY_PATH` (default `~/invoices`) choose the target, e.g.
+`DEPLOY_HOST=myserver ./deploy.sh`. It builds for the server's architecture (cross-building
+with qemu if needed), runs the test suite inside that image, ships the image
 over SSH, copies `docker-compose.yml` and starts the stack on `127.0.0.1:8082`.
 
 Deploy only from `main` after the PR is merged. `scripts/deploy-check.sh` refuses uncommitted
@@ -101,11 +103,24 @@ PRs move onto `main`, and `main` rejects force pushes and deletion. Emergency bu
 
 ### Public hostname
 
-In Cloudflare Zero Trust, add a public hostname to the existing tunnel:
-`invoices.example.com` -> `http://localhost:8082`.
+Caddy on the host terminates TLS and proxies to the loopback port:
 
-Strongly recommended: also add a Cloudflare Access application for `invoices.example.com`
-(policy: your email, one-time PIN). The app has its own login, Access adds a second layer.
+```
+invoices.example.com {
+	reverse_proxy 127.0.0.1:8082 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+```
+
+The app takes the client IP for the login throttle from `X-Real-IP` (falling back to the socket
+peer) and trusts no other forwarding header, so the port must stay loopback-only and Caddy must
+always overwrite `X-Real-IP`. Cookies are always `Secure` and redirects are relative, so the
+plain-HTTP hop from Caddy needs no `X-Forwarded-Proto` handling.
+
+Every failed login writes one line `login failed ip=<ip>` to stdout. The `app` service logs to
+journald with the tag `invoices`, so fail2ban can match it, e.g. with a filter
+`failregex = ^login failed ip=<HOST>$` and `journalmatch = SYSLOG_IDENTIFIER=invoices`.
 
 ## Operations
 
