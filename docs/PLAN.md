@@ -23,7 +23,7 @@ Reachable at `invoices.example.com` behind a login.
 | Storage      | SQLite (WAL) + PDF files on disk         | One user, zero ops, trivially backed up. |
 | Runtime      | Docker on `debian:trixie-slim` with Debian's python3-reportlab/flask/gunicorn | PyPI has no armv7 wheels for Pillow; Debian packages are prebuilt for armhf. |
 | Deploy       | Cross-build locally, `docker save` over SSH | Same pattern as the other Pi apps; the Pi never builds. |
-| Ingress      | Existing Cloudflare Tunnel -> `127.0.0.1:8082` | No open ports, TLS handled by Cloudflare. |
+| Ingress      | Caddy on the host -> `127.0.0.1:8082`     | TLS by Let's Encrypt, app never exposed directly. Replaced the Cloudflare Tunnel on the move from the Pi to a Hetzner server (2026-11). |
 
 ## Data model
 
@@ -152,8 +152,9 @@ Off-site target is intentionally left open; the backup directory is the pickup p
 - Single user, scrypt password hash from env, 12h session, Secure/HttpOnly/SameSite cookies.
 - CSRF token on every POST, login throttle (5 failures -> 15 min lock per client IP).
 - Strict CSP, no inline scripts, `X-Frame-Options: DENY`, `no-store` on authenticated pages.
-- Port bound to loopback only; Cloudflare Tunnel is the only ingress.
-- Recommended: add a Cloudflare Access policy for `invoices.example.com` as a second factor.
+- Port bound to loopback only; Caddy is the only ingress. Client IP from `X-Real-IP`, which Caddy
+  always overwrites; no other forwarding header is trusted.
+- Every failed login logs `login failed ip=<ip>` to journald (tag `invoices`); fail2ban bans on it.
 - Personal data (IBAN, tax number, address) lives only in `config/sender.toml` on the server,
   never in git.
 

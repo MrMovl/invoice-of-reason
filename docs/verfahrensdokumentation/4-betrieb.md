@@ -4,8 +4,17 @@ Technische Details zu Befehlen: `README.md`, `docs/BACKUP.md`, `docs/EXPORT.md` 
 
 ## 4.1 Installation und Betrieb
 
-- Betrieb als Docker-Stack auf einem eigenen Server (Dienste `app` und `backup`), erreichbar nur
-  über einen Cloudflare-Tunnel. Der Port ist nur lokal gebunden; es gibt keine offenen Ports.
+- Betrieb als Docker-Stack (Dienste `app`, `backup` und `report`) auf einem eigenen gemieteten
+  Server (Hetzner Cloud, Rechenzentrum in Deutschland, Debian).
+- Erreichbar nur über HTTPS: Der Webserver Caddy auf dem Server beendet TLS (Zertifikate von
+  Let's Encrypt) und leitet Anfragen an das Programm weiter. Das Programm ist nur lokal auf dem
+  Server gebunden (Loopback) und von außen nicht direkt erreichbar.
+- Offen sind nur die Ports 22 (SSH), 80 (Weiterleitung auf HTTPS, Zertifikatsabruf) und 443
+  (HTTPS). Anmeldung am Server per SSH nur mit Schlüssel, nicht mit Passwort.
+- fail2ban sperrt IP-Adressen nach wiederholten Fehlversuchen bei SSH und bei der Anmeldung am
+  Programm. Dafür protokolliert das Programm jeden Fehlversuch mit der IP-Adresse des Clients
+  (ohne Benutzername und Passwort) in das Systemprotokoll (journald).
+- Die Sicherungen (4.4) werden täglich von einem Rechner beim Unternehmer abgeholt.
 - Persistente Daten im Installationsverzeichnis: `data/` (Datenbank, Archiv, `dokumentation/` mit
   Teil 6 und weiteren Unterlagen), `backups/`
   (Sicherungen, Exporte), `config/sender.toml` (Absenderdaten, nur lesend eingebunden), `.env`
@@ -18,8 +27,8 @@ Technische Details zu Befehlen: `README.md`, `docs/BACKUP.md`, `docs/EXPORT.md` 
 - Ein Benutzerkonto; Passwort mindestens 12 Zeichen, gespeichert nur als scrypt-Hash.
 - Sitzung 12 Stunden, Cookies nur über HTTPS, CSRF-Token bei jeder Änderung, Sperre für 15 Minuten
   nach 5 Fehlversuchen je Client.
-- Empfohlen und in Teil 6 festzuhalten: vorgeschaltete Zugangskontrolle (Cloudflare Access) als
-  zweiter Faktor.
+- Die Sperre zählt je IP-Adresse des Clients, die Caddy dem Programm übergibt; zusätzlich sperrt
+  fail2ban wiederholt fehlschlagende Adressen auf Serverebene (4.1).
 - Wer Zugriff auf den Server und seine Dateien hat und wie (z. B. SSH mit Schlüssel): Teil 6.
 - Optional nur lesender Zugriff auf Geschäftszahlen: Der Dienst `report` schreibt stündlich eine
   Berichtsdatei (`invoices report --json`, Datenbank nur lesend geöffnet, keine Änderungen). Ein

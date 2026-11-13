@@ -1,5 +1,5 @@
 # Production stack. The image is built on a dev machine and shipped by deploy.sh;
-# the Pi does not build it. Everything persistent lives next to this file:
+# the server does not build it. Everything persistent lives next to this file:
 #   ./data     SQLite database + archived PDFs (keep 10 years)
 #   ./backups  daily backup tarballs, the pickup point for off-site copies
 #   ./reports  report.json for the read-only SSH user (INVOICES_REPORT_DIR overrides it)
@@ -9,10 +9,16 @@ services:
   app:
     image: ${APP_IMAGE:-invoice-of-reason:latest}
     restart: unless-stopped
-    # Loopback only. Cloudflare Tunnel is the sole ingress; Docker bypasses ufw,
-    # so publishing on 0.0.0.0 would expose the app to the whole LAN.
+    # Loopback only. Caddy on the host terminates TLS and is the sole ingress; Docker bypasses
+    # the host firewall, so publishing on 0.0.0.0 would expose the app directly.
     ports:
       - "127.0.0.1:8082:8000"
+    # journald, so fail2ban can read the "login failed ip=..." lines (SYSLOG_IDENTIFIER=invoices).
+    # `docker compose logs` keeps working with this driver.
+    logging:
+      driver: journald
+      options:
+        tag: invoices
     env_file: .env
     volumes:
       - ./data:/data

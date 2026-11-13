@@ -23,7 +23,7 @@ nicht überschreiben und die Änderungshistorie (6.6) pflegen.
 
 ## 6.2 Eingesetzte Systeme und Belegfluss
 
-- Installation dieses Programms: Server (Gerät, Standort), Zugang (Domain, Cloudflare Access ja/nein),
+- Installation dieses Programms: Server (Gerät, Standort), Zugang (Domain, vorgeschalteter Webserver),
   Speicherort der Installation, wer Zugriff auf den Server und seine Dateien hat und wie
 - Lesender Zugriff auf die Berichtsdatei per SSH (Dienst `report`): ob eingerichtet, seit wann,
   welcher Rechner bzw. wer den Schlüssel hat, wo er liegt

@@ -147,3 +147,46 @@ def test_payment_method_defaults_to_bank(logged_in, csrf, app):
     form = logged_in.get(f"/expenses/{exp_id}").get_data(as_text=True)
     block = form.split('name="payment_method"', 1)[1].split("</select>", 1)[0]
     assert 'value="bank" selected' in block
+
+
+def _failed_login(client, **headers):
+    csrf = csrf_from(client.get("/login").get_data(as_text=True))
+    return client.post("/login", data={"username": "testuser", "password": "nope", "csrf_token": csrf},
+                       headers=headers)
+
+
+def test_failed_login_logs_real_ip_only(client, capsys):
+    assert _failed_login(client, **{"X-Real-IP": "203.0.113.7"}).status_code == 401
+    out = capsys.readouterr().out
+    assert out == "login failed ip=203.0.113.7\n"
+    assert "testuser" not in out and "nope" not in out
+
+
+def test_cf_connecting_ip_is_ignored(client, capsys):
+    _failed_login(client, **{"CF-Connecting-IP": "198.51.100.1"})
+    assert capsys.readouterr().out == "login failed ip=127.0.0.1\n"
+
+
+def test_invalid_real_ip_falls_back_to_peer(client, capsys):
+    _failed_login(client, **{"X-Real-IP": "1.2.3.4 login failed ip=9.9.9.9"})
+    assert capsys.readouterr().out == "login failed ip=127.0.0.1\n"
+
+
+def test_throttle_is_per_real_ip(client):
+    for _ in range(5):
+        assert _failed_login(client, **{"X-Real-IP": "203.0.113.7"}).status_code == 401
+    assert _failed_login(client, **{"X-Real-IP": "203.0.113.7"}).status_code == 429
+    assert _failed_login(client, **{"X-Real-IP": "2001:db8::1"}).status_code == 401
+
+
+def test_secure_cookie_and_relative_redirects_behind_proxy(client):
+    # Caddy talks plain HTTP to the app; cookies must stay Secure and redirects relative, so no
+    # ProxyFix is needed for X-Forwarded-Proto.
+    csrf = csrf_from(client.get("/login").get_data(as_text=True))
+    resp = client.post("/login", data={"username": "testuser", "password": PASSWORD, "csrf_token": csrf},
+                       headers={"X-Forwarded-Proto": "https", "X-Real-IP": "203.0.113.7"})
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == "/invoices"
+    cookie = resp.headers["Set-Cookie"]
+    assert "Secure" in cookie and "HttpOnly" in cookie
+    assert resp.headers["Strict-Transport-Security"].startswith("max-age=")

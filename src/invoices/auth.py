@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hmac
+import ipaddress
 import secrets
 import threading
 import time
@@ -53,8 +54,22 @@ throttle = LoginThrottle()
 
 
 def client_key() -> str:
-    # The app only listens on loopback behind Cloudflare Tunnel, so this header is set by Cloudflare.
-    return request.headers.get("CF-Connecting-IP") or request.remote_addr or "unknown"
+    # The app only listens on loopback behind Caddy, which always overwrites X-Real-IP with the
+    # real client IP. Anything that is not a plain IP address (missing header, a direct request on
+    # loopback) falls back to the socket peer, so the value is safe to write into the log line
+    # fail2ban reads.
+    for candidate in (request.headers.get("X-Real-IP", ""), request.remote_addr or ""):
+        try:
+            return str(ipaddress.ip_address(candidate.strip()))
+        except ValueError:
+            continue
+    return "unknown"
+
+
+def log_failed_login(ip: str) -> None:
+    # One stable line per failure on stdout (journald, tag "invoices"); fail2ban matches it.
+    # Never the username or password.
+    print(f"login failed ip={ip}", flush=True)
 
 
 def check_credentials(username: str, password: str) -> bool:

@@ -45,7 +45,7 @@ Handels- und Geschäftsbriefe, Verträge, Steuerbescheide, Papierbelege vor der 
 ## 1.3 Systemübersicht
 
 ```
-Browser ──HTTPS──> Cloudflare Tunnel ──> Server (Docker)
+Browser ──HTTPS──> Caddy (TLS) ──> Server (Docker, nur lokal erreichbar)
                                           ├─ app     Flask-Webanwendung, Anmeldung, Rechnungen, Belege
                                           ├─ backup  tägliche Datensicherung mit Prüfung
                                           └─ Daten   data/invoices.sqlite3   Datenbank
